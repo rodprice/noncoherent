@@ -34,7 +34,7 @@ ELF:=$(BIN_DIR)/app.out
 # Compile flags
 # CFLAGS:= -mmcu=msp430g2553 -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wall -Werror -Wextra -Wshadow -std=gnu90 -Wpedantic -MMD -I$(INC_DIR)
 # CFLAGS:= -mmcu=msp430g2553 -c -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
-CFLAGS:= -c -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
+CFLAGS:= -c -g -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 # Linker flags
 LDFLAGS:= -L$(TOOL_LIB_DIR)
 

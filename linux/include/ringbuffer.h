@@ -15,7 +15,7 @@
 
 
 /* Number of characters in the buffer. Must be a power of 2. */
-#define RINGSIZE 8
+#define RINGSIZE 16
 
 typedef struct rbuf {
   uint8_t* buffer;
@@ -45,6 +45,6 @@ void rbpointers(ringbuffer* rb);
 void test_rbqueue();
 void test_rbprint();
 void test_rbpointers();
-
+void test_rbempty_rbfull();
 
 #endif

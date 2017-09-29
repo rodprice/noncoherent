@@ -183,4 +183,35 @@ void test_rbpointers() {
   printf("get -> %c ... ", rbget(&ring)); rbpointers(&ring); printf("\n");
 }
 
+void test_helper(ringbuffer* ring) {
+  printf("(%d,%d) ", rbempty(ring), rbfull(ring));
+  rbprint(ring);
+  printf("\n");
+}
+void test_rbempty_rbfull() {
+  ringbuffer ring;
+  rbinit(&ring);
+  printf("initial  ... "); test_helper(&ring);
+  rbput(&ring, 'A'); printf("put -> %c ... ",'A'); test_helper(&ring);
+  rbput(&ring, 'B'); printf("put -> %c ... ",'B'); test_helper(&ring);
+  rbput(&ring, 'C'); printf("put -> %c ... ",'C'); test_helper(&ring);
+  rbput(&ring, 'D'); printf("put -> %c ... ",'D'); test_helper(&ring);
+  rbput(&ring, 'E'); printf("put -> %c ... ",'E'); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  rbput(&ring, 'F'); printf("put -> %c ... ",'F'); test_helper(&ring);
+  rbput(&ring, 'G'); printf("put -> %c ... ",'G'); test_helper(&ring);
+  rbput(&ring, 'H'); printf("put -> %c ... ",'H'); test_helper(&ring);
+  rbput(&ring, 'I'); printf("put -> %c ... ",'I'); test_helper(&ring);
+  rbput(&ring, 'J'); printf("put -> %c ... ",'J'); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+  printf("get -> %c ... ", rbget(&ring)); test_helper(&ring);
+}
+
 #endif

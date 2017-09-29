@@ -58,103 +58,218 @@ uint8_t ascii2morse(char ascii) {
 }
 
 
-/* Number of ticks (trips through the ISR) per time unit */
-#define TIMEUNIT 24
-
 #define LSB 0x01
 #define MSB 0x80
-#define SPACE 0xFF
-#define NEXT(bits) (((bits) << 1) | LSB)
-#define DONE(bits) (((bits) == 0x00) || ((bits) == 0xFF))
-
-/* Character definitions */
 #define DOT       0b10111111
 #define DASH      0b11101111
-#define SPACEDOT  0b00010111
-#define SPACEDASH 0b00011101
+#define SPACEDOT  0b00101111
+#define SPACEDASH 0b00111011
 #define SPACEWORD 0b00001111
 
-static volatile uint8_t mcode;  /* the current Morse code being sent */
-static volatile uint8_t mchar;  /* the character being sent */
-static volatile uint8_t ticks;  /* ticks until end of current time unit */
+static uint8_t mcode;  /* the current Morse code being sent */
+static uint8_t mchar;  /* the character being sent */
+static uint8_t ticks;  /* ticks until end of current time unit */
 
 static ringbuffer ring;
 
+typedef uint8_t BIT;
 
-/* Prototype for interrupt routine */
-void isr() {
-  if (ticks == 0) {
-    ticks = TIMEUNIT;
-    if (DONE(mchar)) {
-      if (DONE(mcode)) {
-        if (rbempty(&ring)) {
-          iowrite(0);           /* turn off the transmitter */
-          return;
-        } else { /* not done with buffer, done with letter, character */
-          mcode = rbget(&ring); /* get a letter and queue up the next */
-          if (mcode == SPACE)   /* we're at the end of a word */
-            mchar = SPACEWORD;
-          else                  /* get the current character */
-            mchar = (mcode & MSB) ? SPACEDASH : SPACEDOT ;
-          iowrite(mchar & LSB); /* send out the first bit */
-          mchar = NEXT(mchar);  /* queue up the next bit */
-          mcode = NEXT(mcode);  /* queue up the next character */
+/* I'm sure there's a better way to do this without putting stuff on
+   the stack, but... this shifts out the msb of reg, while shifting in
+   whatever happened to be in the lsb. */
+BIT next(uint8_t *reg) {
+  BIT msb, lsb;
+  msb = *reg & MSB;
+  lsb = *reg & LSB;
+  *reg <<= 1;
+  if (lsb)
+    *reg |= LSB;
+  else
+    *reg &= 0xFE;
+  return msb;
+}
+
+/* Raturns 1 iff work is done */
+inline uint8_t done(uint8_t bits) {
+  return ((bits == 0x00) || (bits == 0xFF));
+}
+
+/* This doesn't do spacing between letters and words ... yet */
+BIT tock() {
+  /* get a new bit and queue up the next one */
+  if (done(mchar))
+    {  /* get a new mchar and queue up the next one */
+      if (done(mcode))
+        {  /* get a new mcode and queue up the next one */
+          if (rbempty(&ring))
+            { /* wait for new letters in the buffer */
+              mcode = 0x00;
+              mchar = 0x00;
+              return 0;
+            }
+          else
+            {
+              mcode = rbget(&ring);
+              /* mcode = ascii2morse(rbget(&ring)); */
+            if (mcode == 0xFF)
+              mchar = SPACEWORD;
+            else
+              mchar = next(&mcode) ? SPACEDASH : SPACEDOT ;
+            }
         }
-      } else { /* not done with letter, done with character */
-        mchar = (mcode & MSB) ? DASH : DOT ; /* get the next character */
-        iowrite(mchar & LSB);   /* send out the first bit */
-        mchar = NEXT(mchar);    /* queue up the next bit */
-        mcode = NEXT(mcode);    /* queue up the next character */
-      }
-    } else { /* not done with letter or character */
-      iowrite(mchar & 0x80);    /* send out the current bit */
-      mchar = NEXT(mchar);      /* queue up the next bit */
+      else
+        {
+          mchar = next(&mcode) ? DASH : DOT ;
+        }
     }
-  } else {/* not done with time unit */
-    ticks--;                    /* queue up the next tick */
+  iowrite(next(&mchar));
+  return 1;
+}
+
+
+#if DEBUG_MORSE
+
+#include <stdio.h>
+#include <string.h>
+
+char* byte2binary(uint8_t byte);
+
+static int idx = 0;
+static int count = 0;
+static char* msg = "AD0YX OOPS";
+static char signal[SIGNAL_LENGTH];
+
+/* Debugging for tock()*/
+void printock() {
+  char* tmchar = byte2binary(mchar);
+  printf("%s   ", tmchar);
+  char* tmcode = byte2binary(mcode);
+  printf("%s   ", tmcode);
+  rbprint(&ring);
+  printf("   %s\n", signal);
+}
+
+/* Check for a 'o' followed by n '_' in the signal buffer */
+int trailing(int n) {
+  int i;
+  if (idx > n) {
+    for (i=idx-n; i<idx; i++)
+      if (signal[i] != '_')
+        return 0;
+    if (signal[idx-n-1] == 'o')
+      return 1;
   }
+  return 0;
 }
 
 /* Stand-in for digital write to pin */
-static int idx = 0;
-static char signal[80];
 void iowrite(uint8_t bit) {
-  if (idx < 80) {
+  int trail3, trail7;
+  trail3 = trailing(3);
+  trail7 = trailing(7);
+  if (idx < SIGNAL_LENGTH) {
     if (bit == 0)
       signal[idx++] = '_';
     else
       signal[idx++] = 'o';
   }
+  if (idx==1 || trail7 || trail3) {
+    printf("\n%c -> %c", msg[count++], signal[idx-1]);
+  } else {
+    printf("%c", signal[idx-1]);
+  }
 }
 
-char* byte2binary(uint8_t byte);
-
-void morse_init_test() {
+char* morse_init_test() {
   int i;
-  ringbuffer ring;
+  
   idx = 0;
-  for (i=0; i<80; i++)
+  for (i=0; i<SIGNAL_LENGTH; i++)
     signal[i] = '\0';
 
+  /* This is done in setup */
   rbinit(&ring);
-  rbput(&ring, 'A');
-  rbput(&ring, 'D');
-  rbput(&ring, '0');
-  rbput(&ring, 'Y');
-  rbput(&ring, 'X');
   
+  /* This is done in the main loop */
+  msg = "AD0YX OOPS";
+  for (i=0; i<strlen(msg); i++)
+    rbput(&ring, ascii2morse(msg[i]));
+  
+  /* Clean up */
   ticks = 0;
   mchar = 0xFF;
   mcode = 0xFF;
+
+  return msg;
 }
 
-#include <stdio.h>
-  
-void printisr() {
-  printf("%s   %s   %s   %s\n",
-         byte2binary(ticks),
-         byte2binary(mchar),
-         byte2binary(mcode),
-         signal);
+/* This code is for illustration and testing purposes only */
+char* make_dots_and_dashes(uint8_t code) {
+  int i;
+  uint8_t ltr, lsb, msb;
+  static char dotdash[10];
+  for (i=0; i<9; i++)
+    dotdash[i] = 0;
+  i = 0;
+  ltr = code;
+  for (i=0; i<8; i++) {
+    msb = ltr & 0x80;
+    if (msb)                    /* generate either a dot or a dash */
+      dotdash[i] = '-';
+    else
+      dotdash[i] = '.';
+    lsb = ltr & 0x01;           /* grab the lsb */
+    ltr <<= 1;                  /* left-shift the code */
+    if (lsb)
+      ltr |= 0x01;              /* make the new lsb a 1 */
+    else
+      ltr &= 0xFE;              /* make the new lsb a 0 */
+    if ((ltr == 0) || (ltr == 255))
+      break;
+  }
+  dotdash[++i] = ' ';             /* pause between letters */
+  dotdash[++i] = '\0';
+  return dotdash;
 }
 
+void test_tock() {
+  int i;
+  char* message;
+
+  message = morse_init_test();
+  printf("\nmessage = %s\n", message);
+  for (i=0; i<SIGNAL_LENGTH; i++) {
+    if (!tock())
+      break;
+  }
+  printf("\n\n%d iterations\n\n", i);
+}  
+
+
+char* byte2binary(uint8_t byte) {
+  int i;
+  uint8_t mask = 0x80;
+  static char binary[9] = { ' ',' ',' ',' ',' ',' ',' ',' ','\0' };
+  for (i=0; i<8; i++) {
+    binary[i] = mask & byte ? '1' : '0' ;
+    mask >>= 1;
+  }
+  return binary;
+}
+
+static const char* letters = 
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,?'!/()&:;=+-_\"$@";
+
+void run_through_the_lookup_table() {
+  int i;
+
+  uint8_t code;
+  char* dotdash;
+  for (i=0; i<strlen(letters); i++) {
+    code = ascii2morse(letters[i]);
+    dotdash = make_dots_and_dashes(code);
+    printf("%x  %c   %s   %s\n", letters[i], letters[i], byte2binary(code), dotdash);
+  }
+}
+
+#endif

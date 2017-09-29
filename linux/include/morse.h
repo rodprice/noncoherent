@@ -6,15 +6,20 @@
 
 #ifndef MORSE_H
 #define MORSE_H
+#define DEBUG_MORSE 1
 
 #include <stdint.h>
+
+/* Number of ticks (trips through the ISR) per time unit */
+#define TIMEUNIT 5
 
 /*
  * Morse code definition.
  *
  * These codes are taken from the Wikipedia article "Morse code," at
  * https://en.wikipedia.org/wiki/Morse_code.  It includes all codes as
- * listed in the article.
+ * listed in the article, including prosigns, excluding the codes
+ * marked as non-English.
  *
  * The length of a dot is one unit.  A dash is three units.  The space
  * between parts of the same letter is one unit.  The space between
@@ -112,10 +117,25 @@ uint8_t ascii2morse(char ascii);
 /* Interrupt service routine */
 void isr();
 
+/* Generate Morse code sequence */
+uint8_t tock();
+
 /* Stand-in for digital write to pin */
 void iowrite(uint8_t bit);
 
 /* Generate a string of dots and dashes from a Morse code */
 char* make_dots_and_dashes(uint8_t code);
+
+#if DEBUG_MORSE
+#define SIGNAL_LENGTH 4096
+#include "ringbuffer.h"
+char* byte2binary(uint8_t byte);
+char* morse_init_test();
+void printisr();
+void printock();
+void printsignal();
+void run_through_the_lookup_table();
+void test_tock();
+#endif
 
 #endif
