@@ -130,12 +130,12 @@ char* make_dots_and_dashes(uint8_t code);
 #define SIGNAL_LENGTH 4096
 #include "ringbuffer.h"
 char* byte2binary(uint8_t byte);
-char* morse_init_test();
+void morse_init_test(char* message);
 void printisr();
 void printock();
 void printsignal();
 void run_through_the_lookup_table();
-void test_tock();
+void test_tock(char* message);
 #endif
 
 #endif
