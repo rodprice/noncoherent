@@ -11,10 +11,8 @@
 #define RINGBUFFER_H
 
 #include <stdint.h>
+#include "config.h"
 
-
-/* Number of characters in the buffer. Must be a power of 2. */
-#define RINGSIZE 8
 
 typedef struct rbuf {
   uint8_t* buffer;

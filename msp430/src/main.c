@@ -7,6 +7,8 @@
 #include <msp430.h>
 #include <stdint.h>
 
+#include "morse.h"
+#include "config.h"
 
 /* create variable __sr on the stack */
 #define SR_ALLOC() uint16_t __sr
@@ -15,23 +17,30 @@
 /* restore the saved value of the status register */
 #define EXIT_CRITICAL() __set_interrupt_state(__sr)
 
-/* sample interval in milliseconds */
-#define PERIOD 500
-#define LED 0x01
-#define XMIT 0x04
+/* Message to be sent in Morse code */
+static const char* message = MESSAGE;
 
-static uint16_t tick;       /* timer tick */
+static uint16_t ticks;          /* morse code counter */
+static ringbuffer ring;         /* morse code letters in the queue */
+static volatile uint32_t clock; /* real-time clock */
 
+
+inline void xtal_pin_set() {
+  /* Set output pin for crystal fault */
+  if (BCSCTL3 & LFXT1OF)
+    P1OUT |= XTAL_FAULT_PIN;
+  else
+    P1OUT &= ~XTAL_FAULT_PIN;
+}
 
 int timer_start(void) {
-  /* clock source SMCLK, divide by 1, timer off */
-  TACTL = TASSEL1 | ID0 | MC0 | TACLR;
-  /* interrupt every 1 ms */
-  TACCR0 = 100;
-  /* compare mode, interrupt enabled */
-  TACCTL0 = CCIE;
-  /* timer in up mode and we're off... */
-  TACTL |= MC1;
+  xtal_pin_set();           /* set high until crystal osc is running */
+  /* reset all timer "start tick" outputs */
+  P1OUT &= ~(MSEQ_START_PIN | MORSE_START_PIN | EPOCH_START_PIN);
+  TACTL = TASSEL0 | ID0 | MC0 | TACLR; /* clock source ACLK, divide by 1, timer off */
+  TACCR0 = MSEQ_TICKS;      /* interrupt frequency in units of ACLK */
+  TACCTL0 = CCIE;           /* compare mode, interrupt enabled */
+  TACTL |= MC1;             /* timer in up mode and we're off... */
   return 0;
 }
 
@@ -42,44 +51,60 @@ int timer_stop(void) {
 }
 
 __attribute__((interrupt(TIMER0_A0_VECTOR))) void timer_isr(void) {
-  /* clear the interrupt flag */
-  TACCTL0 &= ~CCIFG;
-  /* increment the timer tick */
-  tick++;
-  if (tick >= PERIOD) {
-    tick = 0;
-    P1OUT ^= LED | XMIT;        /* toggle outputs */
+  TACCTL0 &= ~CCIFG;      /* clear the interrupt flag */
+  
+  xtal_pin_set();         /* update the crystal osc status */
+
+  /* real-time clock */
+  if ((BCSCTL3 & LFXT1OF) && (clock == -1))
+    clock = 0;
+  clock++;
+    
+  /* morse code generator */
+  ticks--;
+  P1OUT &= ~(MESSAGE_START_PIN | LETTER_START_PIN | CHARACTER_START_PIN);  /* DEBUG */
+  if (ticks == 0) {
+    tock();              /* send a new morse bit */
+    ticks = MORSE_TICKS; /* start it all over again */
   }
 }
 
+
 int main(int argc, char *argv[])
 {
-    /* Hold the watchdog */
-    WDTCTL = WDTPW + WDTHOLD;
+  int i;
+  
+  /* Hold the watchdog */
+  WDTCTL = WDTPW + WDTHOLD;
+  
+  /* Configure the clocks */
+  DCOCTL = 0;
+  BCSCTL1 = CALBC1_1MHZ;
+  DCOCTL = CALDCO_1MHZ;
+  BCSCTL3 |= LFXT1S_0;        /* ACLK from 32768 Hz watch crystal */
+  
+  /* Set all digital i/o outputs low */
+  P1OUT = 0x00;
+  P2OUT = 0x00;
+  
+  /* Set all digital i/o pins to output */
+  P1DIR = 0xFF;
+  P2DIR = 0xFF;
+  
+  /* Initialize data structures */
+  clock = -1;
+  rbinit(&ring);
+  inittock(&ring);
+  
+  __enable_interrupt();
+  timer_start();
 
-    /* configure the clocks */
-    DCOCTL = 0;
-    BCSCTL1 = CALBC1_1MHZ;
-    DCOCTL = CALDCO_1MHZ;
-    BCSCTL3 |= LFXT1S_2;        /* ACLK from internal VLO */
-
-    /* set all digital i/o pins to output */
-    P1DIR = 0xFF;
-    P2DIR = 0xFF;
-
-    /* Set all digital i/o outputs high */
-    P1OUT = 0xFF;
-    P2OUT = 0xFF;
-
-    __enable_interrupt();
-    timer_start();
-
-    while (1) {
-        /* Wait for 2000000 cycles */
-        /* __delay_cycles(2000000); */
-        
-        /* Toggle P1.0 and P1.3 output */
-        /* P1OUT ^= LED | XMIT; */
-  }
+  /* Send the message repeatedly */
+  while (1)
+    {
+    /* Push the letters into the queue as fast as they'll go in */
+    for (i=0; i<sizeof(MESSAGE)-1; i++)
+      while (rbput(&ring, message[i])); /* spin until room in queue */
+    }
 }
 

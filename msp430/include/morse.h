@@ -1,15 +1,23 @@
+/**
+ * morse.c, generation of Morse code from ASCII strings
+ * Rodney Price, Sept 2017
+ * 
+ */
+
 #ifndef MORSE_H
 #define MORSE_H
 
 #include <stdint.h>
+#include "ringbuffer.h"
 
 
 /*
  * Morse code definition.
  *
  * These codes are taken from the Wikipedia article "Morse code," at
- * https://en.wikipedia.org/wiki/Morse_code.  It includes all ITU-R
- * codes as listed in the article.
+ * https://en.wikipedia.org/wiki/Morse_code.  It includes all codes as
+ * listed in the article, including prosigns, excluding the codes
+ * marked as non-English.
  *
  * The length of a dot is one unit.  A dash is three units.  The space
  * between parts of the same letter is one unit.  The space between
@@ -33,80 +41,81 @@
  * illustrates the process.
  */
 
-#define MORSE_LUT_SIZE 55
+#define MORSE_LUT_SIZE 61
 
+/* Morse code lookup table */
 static const uint8_t morse[MORSE_LUT_SIZE] =
   {
-    0b   01111,                 /* '1' */
-    0b   00111,                 /* '2' */
-    0b   00011,                 /* '3' */
-    0b   00001,                 /* '4' */
-    0b   00000,                 /* '5' */
-    0b   10000,                 /* '6' */
-    0b   11000,                 /* '7' */
-    0b   11100,                 /* '8' */
-    0b   11110,                 /* '9' */
-    0b   11111,                 /* '0' */
-    0b      01,                 /* 'A' */
-    0b    1000,                 /* 'B' */
-    0b    1010,                 /* 'C' */
-    0b     100,                 /* 'D' */
-    0b       0,                 /* 'E' */
-    0b    0010,                 /* 'F' */
-    0b    0000,                 /* 'H' */
-    0b      00,                 /* 'I' */
-    0b    0111,                 /* 'J' */
-    0b     101,                 /* 'K' */
-    0b    0100,                 /* 'L' */
-    0b      11,                 /* 'M' */
-    0b      10,                 /* 'N' */
-    0b     111,                 /* 'O' */
-    0b     010,                 /* 'R' */
-    0b     000,                 /* 'S' */
-    0b       1,                 /* 'T' */
-    0b     001,                 /* 'U' */
-    0b    0001,                 /* 'V' */
-    0b     011,                 /* 'W' */
-    0b    1001,                 /* 'X' */
-    0b    1011,                 /* 'Y' */
-    0b    1100,                 /* 'Z' */
-    0b  010101,                 /* '.' */
-    0b  110011,                 /* ',' */
-    0b  001100,                 /* '?' */
-    0b  011110,                 /* ''' */
-    0b  101011,                 /* '!' */
-    0b   10010,                 /* '/' */
-    0b   10110,                 /* '(' */
-    0b  101101,                 /* ')' */
-    0b  111000,                 /* ':' */
-    0b  101010,                 /* ';' */
-    0b   10001,                 /* '=' */
-    0b   01010,                 /* '+' */
-    0b  100001,                 /* '-' */
-    0b  010010,                 /* '"' */
-    0b  011010,                 /* '@' */
-    0b  000101,                 /* end of work */
-    0b 0000000,                 /* error */
-    0b     101,                 /* invitation to transmit, or 'K' */
-    0b   10101,                 /* starting signal */
-    0b   01010,                 /* new page signal */
-    0b   00010,                 /* understood, or 'Ŝ' */
-    0b   01000                  /* wait, or ampersand */
+    0b11111000,                 /* '0' */
+    0b01111000,                 /* '1' */
+    0b00111000,                 /* '2' */
+    0b00011000,                 /* '3' */
+    0b00001000,                 /* '4' */
+    0b00000111,                 /* '5' */
+    0b10000111,                 /* '6' */
+    0b11000111,                 /* '7' */
+    0b11100111,                 /* '8' */
+    0b11110111,                 /* '9' */
+    0b01000000,                 /* 'A' */
+    0b10001111,                 /* 'B' */
+    0b10101111,                 /* 'C' */
+    0b10011111,                 /* 'D' */
+    0b01111111,                 /* 'E' */
+    0b00101111,                 /* 'F' */
+    0b11011111,                 /* 'G' */
+    0b00001111,                 /* 'H' */
+    0b00111111,                 /* 'I' */
+    0b01110000,                 /* 'J' */
+    0b10100000,                 /* 'K' */
+    0b01001111,                 /* 'L' */
+    0b11000000,                 /* 'M' */
+    0b10111111,                 /* 'N' */
+    0b11100000,                 /* 'O' */
+    0b01101111,                 /* 'P' */
+    0b11010000,                 /* 'Q' */
+    0b01011111,                 /* 'R' */
+    0b00011111,                 /* 'S' */
+    0b10000000,                 /* 'T' */
+    0b00100000,                 /* 'U' */
+    0b00010000,                 /* 'V' */
+    0b01100000,                 /* 'W' */
+    0b10010000,                 /* 'X' */
+    0b10110000,                 /* 'Y' */
+    0b11001111,                 /* 'Z' */
+    0b01010100,                 /* '.' */
+    0b11001100,                 /* ',' */
+    0b00110011,                 /* '?' */
+    0b01111011,                 /* ''' */
+    0b10101100,                 /* '!' */
+    0b10010111,                 /* '/' */
+    0b10110111,                 /* '(' */
+    0b10110100,                 /* ')' */
+    0b01000111,                 /* '&' */
+    0b11100011,                 /* ':' */
+    0b10101011,                 /* ';' */
+    0b10001000,                 /* '=' */
+    0b01010111,                 /* '+' */
+    0b10000100,                 /* '-' */
+    0b00110100,                 /* '_' */
+    0b01001011,                 /* '"' */
+    0b00010010,                 /* '$' */
+    0b01101011,                 /* '@' */
+    0b00010100,                 /* end of work */
+    0b00000001,                 /* error */
+    0b10100000,                 /* invitation to transmit, or 'K' */
+    0b10101000,                 /* starting signal */
+    0b01010111,                 /* new page signal */
+    0b00010111,                 /* understood, or 'Ŝ' */
+    0b01000111                  /* wait, or ampersand */
   };
 
-volatile uint16_t mcode;
-volatile uint8_t mbit;
+/* Change an ASCII code into a Morse code */
+uint8_t ascii2morse(char ascii);
 
-/* Interrupt routine to send a single Morse character */
-/* void sendchar(uint16_t morse, uint8_t pin) { */
-/*   if (mbit > 1) { */
-/*     P1OUT = pin;                /\* max mbit = 4 if dash, 2 if dot *\/ */
-/*   } else if (mbit == 1) { */
-/*     P1OUT = 0;                  /\* one unit space *\/ */
-/*   } else { */
-    
-/*   } */
-/* } */
+/* Generate Morse code sequence */
+uint8_t tock();
 
+/* Initialize the Morse code generator */
+void inittock(ringbuffer* rb);
 
 #endif
