@@ -8,7 +8,6 @@
 #define MORSE_H
 
 #include <stdint.h>
-#include "ringbuffer.h"
 
 
 /*
@@ -116,6 +115,12 @@ uint8_t ascii2morse(char ascii);
 uint8_t tock();
 
 /* Initialize the Morse code generator */
-void inittock(ringbuffer* rb);
+void inittock();
+
+/* DEBUG: Clear the debug pins */
+void newtock();
+
+/* DEBUG: Get the debug results */
+uint8_t gettock();
 
 #endif

@@ -19,10 +19,11 @@
 #define XTAL_FAULT_PIN BIT1     /* Crystal oscillator fault */
 
 #define XMIT_PIN BIT2           /* Keys transmitter on or off */
+#define MORSE_PIN BIT2          /* Morse code output */
 
 #define MSEQ_PIN BIT3           /* M-sequence output */
 
-#define MORSE_PIN BIT4          /* Morse code output */
+#define MESSAGE_START_PIN BIT4
 
 #define MSEQ_START_PIN BIT5     /* M-sequence start tick */
 #define CHARACTER_START_PIN BIT5
@@ -31,7 +32,7 @@
 #define LETTER_START_PIN BIT6
 
 #define EPOCH_START_PIN BIT7    /* Epoch start tick */
-#define MESSAGE_START_PIN BIT7
+#define WORD_START_PIN BIT7
 
 #define GREEN_LED_PIN BIT6      /* Green LED on the TI Launchpad */
 

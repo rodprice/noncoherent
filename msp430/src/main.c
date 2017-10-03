@@ -17,11 +17,8 @@
 /* restore the saved value of the status register */
 #define EXIT_CRITICAL() __set_interrupt_state(__sr)
 
-/* Message to be sent in Morse code */
-static const char* message = MESSAGE;
 
 static uint16_t ticks;          /* morse code counter */
-static ringbuffer ring;         /* morse code letters in the queue */
 static volatile uint32_t clock; /* real-time clock */
 
 
@@ -34,9 +31,8 @@ inline void xtal_pin_set() {
 }
 
 int timer_start(void) {
+  P1OUT = 0;                /* DEBUG */
   xtal_pin_set();           /* set high until crystal osc is running */
-  /* reset all timer "start tick" outputs */
-  P1OUT &= ~(MSEQ_START_PIN | MORSE_START_PIN | EPOCH_START_PIN);
   TACTL = TASSEL0 | ID0 | MC0 | TACLR; /* clock source ACLK, divide by 1, timer off */
   TACCR0 = MSEQ_TICKS;      /* interrupt frequency in units of ACLK */
   TACCTL0 = CCIE;           /* compare mode, interrupt enabled */
@@ -54,17 +50,20 @@ __attribute__((interrupt(TIMER0_A0_VECTOR))) void timer_isr(void) {
   TACCTL0 &= ~CCIFG;      /* clear the interrupt flag */
   
   xtal_pin_set();         /* update the crystal osc status */
+  P1OUT ^= MSEQ_PIN;      /* DEBUG */
 
   /* real-time clock */
-  if ((BCSCTL3 & LFXT1OF) && (clock == -1))
+  if (!(BCSCTL3 & LFXT1OF) && (clock == -1))
     clock = 0;
   clock++;
     
   /* morse code generator */
   ticks--;
-  P1OUT &= ~(MESSAGE_START_PIN | LETTER_START_PIN | CHARACTER_START_PIN);  /* DEBUG */
   if (ticks == 0) {
+    P1OUT ^= LED_PIN;
+    newtock();           /* DEBUG */
     tock();              /* send a new morse bit */
+    P1OUT = gettock();   /* DEBUG */
     ticks = MORSE_TICKS; /* start it all over again */
   }
 }
@@ -93,8 +92,7 @@ int main(int argc, char *argv[])
   
   /* Initialize data structures */
   clock = -1;
-  rbinit(&ring);
-  inittock(&ring);
+  inittock();
   
   __enable_interrupt();
   timer_start();
@@ -102,9 +100,9 @@ int main(int argc, char *argv[])
   /* Send the message repeatedly */
   while (1)
     {
-    /* Push the letters into the queue as fast as they'll go in */
-    for (i=0; i<sizeof(MESSAGE)-1; i++)
-      while (rbput(&ring, message[i])); /* spin until room in queue */
+      __delay_cycles(2000000);
+      ticks = MORSE_TICKS;
+      inittock();
     }
 }
 

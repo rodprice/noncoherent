@@ -74,22 +74,38 @@ REGISTER ascii2morse(char ascii) {
   } else if (ascii == '@') {
     return morse[53];
   } else {
-    return -1;  /* the rest aren't ASCII characters */
+    return ONES;  /* the rest aren't ASCII characters */
   }
 }
 
+static uint8_t debug;           /* DEBUG */
+
+static const char message[sizeof(MESSAGE)] = MESSAGE;
 
 /* Internal state */
 static REGISTER mcode;  /* the current Morse code being sent */
 static REGISTER mchar;  /* the character being sent */
-static ringbuffer* ring;  /* pointer to static var in main.c */
-
+static uint8_t letter;  /* points to current letter in message */
 
 /* Initialize the Morse code generator */
-inline void inittock(ringbuffer* rb) {
+inline void inittock() {
   mchar = ONES;
   mcode = ONES;
-  ring = rb;
+  letter = 0;
+}
+
+/* DEBUG: Clear the debug pins */
+void newtock() {
+  debug = P1OUT;
+  debug &= ~( MESSAGE_START_PIN |
+              CHARACTER_START_PIN |
+              LETTER_START_PIN |
+              WORD_START_PIN );
+}
+
+/* DEBUG: get the debug results */
+uint8_t gettock() {
+  return debug;
 }
 
 /* All the bits in the character have been sent */
@@ -127,9 +143,11 @@ inline void nextcode() {
 /* Send a new bit and queue up the next one */
 inline void nextchar() {
   if (mchar & BIT7)
-    P1OUT |= MORSE_PIN;   /* send a 1 */
+    debug |= MORSE_PIN;   /* DEBUG */
+    /* P1OUT |= MORSE_PIN;   /\* send a 1 *\/ */
   else
-    P1OUT &= ~MORSE_PIN;  /* send a 0 */
+    debug &= ~MORSE_PIN;  /* DEBUG */
+    /* P1OUT &= ~MORSE_PIN;  /\* send a 0 *\/ */
   mchar <<= 1;            /* queue up the next bit */
   mchar |= BIT0;
 }
@@ -138,22 +156,22 @@ inline void nextchar() {
 BIT tock() {
   if (donechar()) {
     if (donecode()) {
-      if (rbempty(ring)) { 
-        mcode = ZEROS;
-        mchar = ZEROS;
-        return 0;         /* wait for new letters */
+      if (letter >= sizeof(MESSAGE)) { 
+        return 0;
       } else {
-        mcode = rbget(ring);
-        P1OUT |= LETTER_START_PIN; /* DEBUG: signal start of new letter */
+        if (letter == 0)
+          debug |= MESSAGE_START_PIN; /* DEBUG: signal start of message */
+        mcode = message[letter++];
+        debug |= LETTER_START_PIN; /* DEBUG: signal start of new letter */
         if (mcode == ONES) {
-          P1OUT |= MESSAGE_START_PIN; /* DEBUG: signal start of new message */
+          debug |= WORD_START_PIN; /* DEBUG: signal start of new word */
           mchar = SPACEWORD;
         } else {
           nextspacecode();
         }
       }
     } else {
-      P1OUT |= CHARACTER_START_PIN; /* DEBUG: signal start of new character */
+      debug |= CHARACTER_START_PIN; /* DEBUG: signal start of new character */
       nextcode();
     }
   }

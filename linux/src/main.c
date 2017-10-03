@@ -17,10 +17,11 @@
 
 #include <string.h>
 
+#define MESSAGE "AD0YX sending m-sequence    "
+
 int main() {
   /* run_through_the_lookup_table(); */
-  test_tock("AD0YX OOPS");
-  test_tock("ad0yx ok");
+  test_tock(MESSAGE);
   return 0;
 }
 
