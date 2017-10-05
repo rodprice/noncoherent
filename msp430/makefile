@@ -22,11 +22,15 @@
 # print-fc-sections)
 
 
+TARGET_MCU:=msp430g2231
+DEBUG_MCU:=msp430g2553
+
 # Path to the msp430 toolchain
 TOOLCHAIN_ROOT?=/opt/ti/msp430_gcc
 
 # Toolchain variables
 CC:=$(TOOLCHAIN_ROOT)/bin/msp430-elf-gcc
+GDB:=$(TOOLCHAIN_ROOT)/bin/msp430-elf-gdb
 TOOL_INC_DIR:=$(TOOLCHAIN_ROOT)/include
 TOOL_LIB_DIR:=$(TOOLCHAIN_ROOT)/include # linker scripts live in the include dir
 
@@ -54,19 +58,28 @@ OBJS:=$(patsubst %.c,$(OBJ_DIR)/%.o,$(notdir $(SRCS)))
 ELF:=$(BIN_DIR)/app.out
 
 # Compile flags
-# CFLAGS:= -mmcu=msp430g2553 -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wall -Werror -Wextra -Wshadow -std=gnu90 -Wpedantic -MMD -I$(INC_DIR)
-# CFLAGS:= -mmcu=msp430g2553 -c -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
-CFLAGS:= -mmcu=msp430g2231 -mhwmult=none -c -Wall -Os -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
-# Linker flags
-# LDFLAGS:= -mmcu=msp430g2231 --gc-sections -L$(TOOL_LIB_DIR)
-LDFLAGS:= -mmcu=msp430g2231 -L$(TOOL_LIB_DIR)
+CFLAGS:= -mmcu=$(TARGET_MCU) -mhwmult=none -c -Wall -Os -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
+DEBUG_CFLAGS:= -mmcu=$(DEBUG_MCU) -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wshadow -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
+# CFLAGS:= -mmcu=$(TARGET_MCU) -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wall -Werror -Wextra -Wshadow -std=gnu90 -Wpedantic -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
+# DEBUG_CFLAGS:= -mmcu=$(DEBUG_MCU) -c -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 
-# Dependancies
+# Linker flags
+LDFLAGS:= -mmcu=$(TARGET_MCU) -L$(TOOL_LIB_DIR)
+DEBUG_LDFLAGS:= -mmcu=$(DEBUG_MCU) -L$(TOOL_LIB_DIR)
+
+# Dependencies
 DEPS:=$(OBJS:.o=.d)
 
 # Rules
-.PHONY: all
-all: $(ELF)
+.PHONY: all, target, debug, prog, gdb, clean
+
+all: target
+
+debug: CFLAGS := $(DEBUG_CFLAGS)
+debug: LDFLAGS := $(DEBUG_LDFLAGS)
+debug: target
+
+target: $(ELF)
 
 $(ELF) : $(OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@
@@ -74,7 +87,16 @@ $(ELF) : $(OBJS)
 $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $< -o $@
 
-.PHONY: clean
+
+prog:
+	mspdebug rf2500 "prog $(ELF)"
+
+
+gdb:
+	mspdebug rf2500 "prog $(ELF)" "gdb --eval-command target localhost:2000"
+	$(GDB) "build/bin/app.out" 
+
+
 clean: 
 	rm -rf $(BUILD_DIR)
 

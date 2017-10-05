@@ -34,46 +34,30 @@ REGISTER ascii2morse(char ascii) {
   if (48 <= ascii && ascii < 58) {
     return morse[ascii-48];     /* ASCII numerals start at 48 */
   } else if (65 <= ascii && ascii < 91) {
-    return morse[ascii-55];  /* ASCII cap letters start at 65 */
+    return morse[ascii-55];     /* ASCII cap letters start at 65 */
   } else if (97 <= ascii && ascii < 123) {
-    return morse[ascii-87];  /* ASCII small letters start at 97 */
-  } else if (ascii == '.') {
-    return morse[36];
-  } else if (ascii == ',') {
-    return morse[37];
-  } else if (ascii == '?') {
-    return morse[38];
-  } else if (ascii == '\'') {
-    return morse[39];
-  } else if (ascii == '!') {
-    return morse[40];
-  } else if (ascii == '/') {
-    return morse[41];
-  } else if (ascii == '(') {
-    return morse[42];
-  } else if (ascii == ')') {
-    return morse[43];
-  } else if (ascii == '&') {
-    return morse[44];
-  } else if (ascii == ':') {
-    return morse[45];
-  } else if (ascii == ';') {
-    return morse[46];
-  } else if (ascii == '=') {
-    return morse[47];
-  } else if (ascii == '+') {
-    return morse[48];
-  } else if (ascii == '-') {
-    return morse[49];
-  } else if (ascii == '_') {
-    return morse[50];
-  } else if (ascii == '"') {
-    return morse[51];
-  } else if (ascii == '$') {
-    return morse[52];
-  } else if (ascii == '@') {
-    return morse[53];
+    return morse[ascii-87];     /* ASCII small letters start at 97 */
   } else {
+    switch(ascii) {
+    case '.': return morse[36];
+    case ',': return morse[37];
+    case '?': return morse[38];
+    case '\'': return morse[39];
+    case '!': return morse[40];
+    case '/': return morse[41];
+    case '(': return morse[42];
+    case ')': return morse[43];
+    case '&': return morse[44];
+    case ':': return morse[45];
+    case ';': return morse[46];
+    case '=': return morse[47];
+    case '+': return morse[48];
+    case '-': return morse[49];
+    case '_': return morse[50];
+    case '"': return morse[51];
+    case '$': return morse[52];
+    case '@': return morse[53];
+    }
     return ONES;  /* the rest aren't ASCII characters */
   }
 }
@@ -97,8 +81,7 @@ inline void inittock() {
 /* DEBUG: Clear the debug pins */
 void newtock() {
   debug = P1OUT;
-  debug &= ~( MESSAGE_START_PIN |
-              CHARACTER_START_PIN |
+  debug &= ~( CHARACTER_START_PIN |
               LETTER_START_PIN |
               WORD_START_PIN );
 }
@@ -143,38 +126,66 @@ inline void nextcode() {
 /* Send a new bit and queue up the next one */
 inline void nextchar() {
   if (mchar & BIT7)
-    debug |= MORSE_PIN;   /* DEBUG */
-    /* P1OUT |= MORSE_PIN;   /\* send a 1 *\/ */
+    P1OUT |= MORSE_PIN;   /* send a 1 */
   else
-    debug &= ~MORSE_PIN;  /* DEBUG */
-    /* P1OUT &= ~MORSE_PIN;  /\* send a 0 *\/ */
+    P1OUT &= ~MORSE_PIN;  /* send a 0 */
   mchar <<= 1;            /* queue up the next bit */
   mchar |= BIT0;
 }
 
 /* Sends a new bit at every call until ring buffer is empty */
+#if DEBUG
+BIT tock() {
+  if (donechar()) {
+    P1OUT |= CHARACTER_START_PIN;     /* DEBUG signal new character */
+    if (donecode()) {
+      P1OUT |= LETTER_START_PIN;      /* DEBUG signal new letter */
+      if (letter >= sizeof(MESSAGE)) { 
+        P1OUT &= ~MESSAGE_START_PIN;  /* DEBUG signal end of message */
+        return 0;
+      } else {
+        if (letter == 0)              /* DEBUG */
+          P1OUT |= MESSAGE_START_PIN; /* DEBUG signal start of message */
+        mcode = ascii2morse(message[letter++]);
+        if (mcode == ONES) {
+          P1OUT |= WORD_START_PIN;    /* DEBUG signal new word */
+          mchar = SPACEWORD;
+        } else {
+          P1OUT &= ~WORD_START_PIN;   /* DEBUG */
+          P1OUT &= ~LETTER_START_PIN; /* DEBUG */
+          nextspacecode();
+        }
+      }
+    } else {
+      P1OUT &= ~WORD_START_PIN;       /* DEBUG */
+      P1OUT &= ~LETTER_START_PIN;     /* DEBUG */
+      nextcode();
+    }
+  } else {                            /* DEBUG */
+    P1OUT &= ~CHARACTER_START_PIN;    /* DEBUG */
+  }
+  nextchar();
+  return 1;
+}
+#else
 BIT tock() {
   if (donechar()) {
     if (donecode()) {
       if (letter >= sizeof(MESSAGE)) { 
         return 0;
       } else {
-        if (letter == 0)
-          debug |= MESSAGE_START_PIN; /* DEBUG: signal start of message */
-        mcode = message[letter++];
-        debug |= LETTER_START_PIN; /* DEBUG: signal start of new letter */
+        mcode = ascii2morse(message[letter++]);
         if (mcode == ONES) {
-          debug |= WORD_START_PIN; /* DEBUG: signal start of new word */
           mchar = SPACEWORD;
         } else {
           nextspacecode();
         }
       }
     } else {
-      debug |= CHARACTER_START_PIN; /* DEBUG: signal start of new character */
       nextcode();
     }
   }
   nextchar();
   return 1;
 }
+#endif

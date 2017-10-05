@@ -15,11 +15,11 @@
    debugging purposes only. */
 
 #define LED_PIN BIT0            /* LED on transmitter board */
+#define MORSE_PIN BIT0          /* Morse code output */
 
 #define XTAL_FAULT_PIN BIT1     /* Crystal oscillator fault */
 
 #define XMIT_PIN BIT2           /* Keys transmitter on or off */
-#define MORSE_PIN BIT2          /* Morse code output */
 
 #define MSEQ_PIN BIT3           /* M-sequence output */
 
@@ -46,7 +46,7 @@
    times per second.  A new bit of the m-sequence is sent at every
    interrupt call.  Given these settings, sending a 4095-bit
    m-sequence will take just less than 1 sec. */
-#define MSEQ_TICKS 2
+#define MSEQ_TICKS 4
 
 /* Defines the number of bits in the shift register.  Choices
    currently are 3, 4, 5, 6, 7, 8, 10, and 12. */
@@ -60,15 +60,9 @@
 /**********************************************************************/
 /* morse code */
 
-/* Defines the time unit of the Morse code generator.  A counter
-   'ticks' (a static 16-bit unsigned int in morse.c) decrements once
-   every interrupt, until it hits 0 and a new Morse code bit is sent.
-   The time unit is then MORSE_TICKS * MSEQ_TICKS / 32768, assuming
-   ACLK is driven from a watch crystal.  If MSEQ_TICKS = 8 and
-   MORSE_TICKS = 1024, this yields a time unit of 250 ms.  Since a
-   Morse code rate of 5 wpm corresponds to a time unit of 240 ms,
-   these settings yield a Morse code rate slightly lower than 5 wpm.  */
-#define MORSE_TICKS 16
+/* Defines the time unit of the Morse code generator.  A Morse code
+   rate of 5 wpm corresponds to a time unit of 240 ms.   */
+#define MORSE_TICKS 24          /* 6 ms */
 
 
 /**********************************************************************/
