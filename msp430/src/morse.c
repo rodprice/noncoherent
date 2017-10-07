@@ -62,10 +62,6 @@ REGISTER ascii2morse(char ascii) {
   }
 }
 
-static uint8_t debug;           /* DEBUG */
-
-static const char message[sizeof(MESSAGE)] = MESSAGE;
-
 /* Internal state */
 static REGISTER mcode;  /* the current Morse code being sent */
 static REGISTER mchar;  /* the character being sent */
@@ -76,19 +72,6 @@ inline void inittock() {
   mchar = ONES;
   mcode = ONES;
   letter = 0;
-}
-
-/* DEBUG: Clear the debug pins */
-void newtock() {
-  debug = P1OUT;
-  debug &= ~( CHARACTER_START_PIN |
-              LETTER_START_PIN |
-              WORD_START_PIN );
-}
-
-/* DEBUG: get the debug results */
-uint8_t gettock() {
-  return debug;
 }
 
 /* All the bits in the character have been sent */
@@ -124,13 +107,10 @@ inline void nextcode() {
 }
 
 /* Send a new bit and queue up the next one */
-inline void nextchar() {
-  if (mchar & BIT7)
-    P1OUT |= MORSE_PIN;   /* send a 1 */
-  else
-    P1OUT &= ~MORSE_PIN;  /* send a 0 */
-  mchar <<= 1;            /* queue up the next bit */
+inline BIT nextchar() {
+  mchar <<= 1;       /* queue up the next bit */
   mchar |= BIT0;
+  return (mchar & BIT7) ? 1 : 0 ;
 }
 
 /* Sends a new bit at every call until ring buffer is empty */
@@ -164,8 +144,7 @@ BIT tock() {
   } else {                            /* DEBUG */
     P1OUT &= ~CHARACTER_START_PIN;    /* DEBUG */
   }
-  nextchar();
-  return 1;
+  return nextchar();
 }
 #else
 BIT tock() {
@@ -185,7 +164,6 @@ BIT tock() {
       nextcode();
     }
   }
-  nextchar();
-  return 1;
+  return nextchar();
 }
 #endif

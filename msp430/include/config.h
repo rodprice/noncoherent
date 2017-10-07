@@ -52,10 +52,6 @@
    currently are 3, 4, 5, 6, 7, 8, 10, and 12. */
 #define REGISTER_LENGTH 3
 
-/* Defines the size of the lookup table used in the Fibonacci shift
-   registers.  Choices are 16 and 256. */
-#define MSEQUENCE_LUT_SIZE 16
-
 
 /**********************************************************************/
 /* morse code */
@@ -69,7 +65,7 @@
 /* ring buffer */
 
 /* Number of characters in the buffer. Must be a power of 2. */
-#define RINGSIZE 16
+#define RINGSIZE 8
 
 
 #endif

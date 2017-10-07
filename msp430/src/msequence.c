@@ -17,7 +17,7 @@
 
 /* Implements a Galois shift register */
 uint16_t galshift(uint16_t bits) {
-  uint16_t carry = (bits & 0x01) << (REGLEN-1);
-  uint16_t next = carry ? (bits^GPOLY) : bits;
+  static volatile uint16_t carry = (bits & 0x01) << (REGLEN-1);
+  static volatile uint16_t next = carry ? (bits^GPOLY) : bits;
   return carry + (next>>1);
 }
