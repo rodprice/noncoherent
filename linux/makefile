@@ -38,7 +38,7 @@ CFLAGS:= -c -g -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 # Linker flags
 LDFLAGS:= -L$(TOOL_LIB_DIR)
 
-# Dependancies
+# Dependencies
 DEPS:=$(OBJS:.o=.d)
 
 # Rules
@@ -54,5 +54,9 @@ $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
 .PHONY: clean
 clean: 
 	rm -rf $(BUILD_DIR)
+
+.PHONY: run
+run:
+	./$(ELF)
 
 -include $(DEPS)

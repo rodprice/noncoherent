@@ -19,9 +19,13 @@
 
 #define MESSAGE "AD0YX sending m-sequence    "
 
+
 int main() {
   /* run_through_the_lookup_table(); */
-  test_tock(MESSAGE);
+  /* test_tock(MESSAGE); */
+  /* test_galshift(); */
+  /* test_fibshift(); */
+  /* test_backfibshift(); */
   return 0;
 }
 

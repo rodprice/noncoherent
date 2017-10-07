@@ -50,10 +50,10 @@
 
 /* Defines the number of bits in the shift register.  Choices
    currently are 3, 4, 5, 6, 7, 8, 10, and 12. */
-#define REGISTER_LENGTH 3
+#define REGISTER_LENGTH 4
 
 /* Defines the size of the lookup table used in the Fibonacci shift
-   registers.  Choices are 16 and 156. */
+   registers.  Choices are 16 and 256. */
 #define LUT_SIZE 16
 
 
@@ -218,6 +218,7 @@ static const uint8_t bits[1023] =
 #define POLY 235
 #define RPOLY 3440
 #define GPOLY 2785
+#define REGLOAD 2048
 #if DEBUG
 static const uint8_t bits[4095] = 
 {
@@ -356,6 +357,9 @@ static const uint8_t bits[4095] =
 
 /* Returns the number of ones in a 16-bit word */
 uint8_t count(uint16_t bits);
+
+/* Implements a Fibonacci shift register */
+uint16_t fibshift(uint16_t bits);
 
 /* The left-shift operation in a "backwards" Fibonacci shift register */
 uint16_t lshift(uint16_t);

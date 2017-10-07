@@ -25,7 +25,7 @@ static const uint8_t lut[16] =
 
 /* This one will be faster */
 #if LUT_SIZE == 256
-static const uint8 lut[256] = 
+static const uint8_t lut[256] = 
 {
   0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,
   1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
@@ -72,7 +72,7 @@ uint8_t count(uint16_t word) {
   uint8_t nib2 = (word & 0x0F00) >> 8;
   uint8_t nib1 = (word & 0x00F0) >> 4;
   uint8_t nib0 =  word & 0x000F;
-  return lut4[nib3] + lut4[nib2] + lut4[nib1] + lut4[nib0];
+  return lut[nib3] + lut[nib2] + lut[nib1] + lut[nib0];
 }
 #endif
 
@@ -81,7 +81,7 @@ uint8_t count(uint16_t word) {
 uint8_t count(uint16_t word) {
   uint8_t hi = (word & 0xFF00) >> 8;
   uint8_t lo =  word & 0x00FF;
-  return lut8[hi] + lut8[lo];
+  return lut[hi] + lut[lo];
 }
 #endif
 
@@ -95,7 +95,7 @@ uint16_t fibshift(uint16_t bits) {
 /* Implements a "backwards" Fibonacci shift register */
 uint16_t backfibshift(uint16_t bits) {
   uint16_t carry = count(bits & RPOLY) & 0x01;
-  return (carry << (REGLEN-1)) + (bits >> 1);
+  return (bits << 1) + carry;
 }
 
 /* Implements a Galois shift register */
@@ -126,3 +126,127 @@ void hadamard(int16_t* a, uint16_t p) {
     }
   }
 }
+
+
+#if DEBUG
+
+
+char* tobinarystring(uint16_t bits) {
+  static char binarystring[REGLOAD+1];
+  int i;
+  uint16_t mask = REGLOAD;
+  for (i=0; i<=REGLOAD; i++)
+    binarystring[i] = '\0';
+  for (i=0; i<REGLEN; i++) {
+    binarystring[i] = (bits & mask) ? '1' : '0';
+    mask >>= 1;
+  }
+  return binarystring;
+}
+
+int mismatch(uint8_t bit, uint16_t reg2) {
+  uint8_t reg;
+  reg = (REGLOAD & reg2) ? 1 : 0;
+  return bit ^ reg;
+}
+
+/* Check whether the MSB of an array matches the bits array at given lag  */
+int matchbits(int lag, uint16_t* sequence) {
+  int i;
+  for (i=0; i<SEQLEN; i++) {
+    if (mismatch(bits[i], sequence[(i+lag) % SEQLEN]))
+      return 0;                 /* failure */
+  }
+  return 1;                     /* success */
+}
+
+static uint16_t galois;         /* Galois shift register */
+
+void test_galshift() {
+  int i=0, lag;
+  static uint16_t record[SEQLEN+REGLEN+1];
+  /* Run the Galois shift register */
+  galois = REGLOAD;
+  printf("%d -> %d (%s)\n", i, ((REGLOAD & galois) ? 1 : 0), tobinarystring(galois));
+  record[0] = galois;
+  for (i=1; i<SEQLEN+1; i++) {
+    galois = galshift(galois);
+    record[i] = galois;
+    printf("%d -> %d (%s)\n", i, ((REGLOAD & galois) ? 1 : 0), tobinarystring(galois));
+  }
+  /* Print out results for various lags */
+  /* for (lag=0; lag<SEQLEN; lag++) { */
+  /*   printf("\nlag = %d\n", lag); */
+  /*   for (i=0; i<SEQLEN; i++) { */
+  /*     printf("%d,", bits[i]); */
+  /*   } */
+  /*   printf("\n"); */
+  /*   for (i=0; i<SEQLEN; i++) { */
+  /*     printf("%d,", (REGLOAD & record[(i + lag) % SEQLEN]) ? 1 : 0); */
+  /*   } */
+  /*   printf("\n"); */
+  /*   for (i=0; i<SEQLEN; i++) { */
+  /*     printf("%d,", mismatch(bits[i], record[(i + lag) % SEQLEN])); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
+  /* Check for matches at various lags */
+  for (lag=0; lag<SEQLEN; lag++) {
+    if (matchbits(lag, record)) {
+      printf("\nFound match to m-sequence at lag = %d\n", lag);
+      return;
+    }
+  }
+  printf("\nNo match to m-sequence found.\n");
+}
+
+
+static uint16_t fibonacci;         /* Fibonacci shift register */
+
+void test_fibshift() {
+  int i=0, lag;
+  static uint16_t record[SEQLEN+REGLEN+1];
+  /* Run the Fibonacci shift register */
+  fibonacci = REGLOAD;
+  printf("%d -> %d (%s)\n", i, ((REGLOAD & fibonacci) ? 1 : 0), tobinarystring(fibonacci));
+  record[0] = fibonacci;
+  for (i=1; i<SEQLEN+1; i++) {
+    fibonacci = fibshift(fibonacci);
+    record[i] = fibonacci;
+    printf("%d -> %d (%s)\n", i, ((REGLOAD & fibonacci) ? 1 : 0), tobinarystring(fibonacci));
+  }
+  for (lag=0; lag<SEQLEN; lag++) {
+    if (matchbits(lag, record)) {
+      printf("\nFound match to m-sequence at lag = %d\n", lag);
+      return;
+    }
+  }
+  printf("\nNo match to m-sequence found.\n");
+}
+
+
+static uint16_t backfibonacci;         /* Fibonacci shift register */
+
+void test_backfibshift() {
+  int i, lag;
+  static uint16_t record[SEQLEN+REGLEN+1];
+  /* Run the Fibonacci shift register */
+  backfibonacci = 1;
+  i = 0;
+  printf("%d -> %d (%s)\n", i, ((REGLOAD & backfibonacci) ? 1 : 0), tobinarystring(backfibonacci));
+  record[0] = backfibonacci;
+  for (i=1; i<SEQLEN; i++) {
+    backfibonacci = backfibshift(backfibonacci);
+    record[i] = backfibonacci;
+    printf("%d -> %d (%s)\n", i, ((REGLOAD & backfibonacci) ? 1 : 0), tobinarystring(backfibonacci));
+  }
+  for (lag=0; lag<SEQLEN; lag++) {
+    if (matchbits(lag, record)) {
+      printf("\nFound match to m-sequence at lag = %d\n", lag);
+      return;
+    }
+  }
+  printf("\nNo match to m-sequence found.\n");
+}
+
+#endif
