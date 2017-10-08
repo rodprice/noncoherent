@@ -32,24 +32,24 @@
 
 
 typedef struct rbuf {
-  const uint8_t* buffer;
-  const size_t length;
+  uint8_t* buffer;
+  uint8_t length;
   volatile uint16_t head;
   volatile uint16_t tail;
 } ringbuffer;
 
 
 /* Make a new ring buffer */
-ringbuffer rbnew(uint8_t* buf, size_t len);
+void rbnew(ringbuffer* rb, uint8_t* buf, uint8_t len);
 
 /* Initialize a ring buffer */
 void rbinit(ringbuffer* rb);
 
 /* Returns 1 if the buffer is full, 0 otherwise */
-inline uint8_t rbfull(ringbuffer* rb);
+uint8_t rbfull(ringbuffer* rb);
 
 /* Returns 1 if the buffer is empty, 0 otherwise */
-inline uint8_t rbempty(ringbuffer* rb);
+uint8_t rbempty(ringbuffer* rb);
 
 /* Gets the head of the ring buffer, returns 0 if empty */
 uint8_t rbget(ringbuffer* rb);

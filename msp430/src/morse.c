@@ -65,14 +65,7 @@ REGISTER ascii2morse(char ascii) {
 /* Internal state */
 static REGISTER mcode;  /* the current Morse code being sent */
 static REGISTER mchar;  /* the character being sent */
-static uint8_t letter;  /* points to current letter in message */
 
-/* Initialize the Morse code generator */
-inline void inittock() {
-  mchar = ONES;
-  mcode = ONES;
-  letter = 0;
-}
 
 /* All the bits in the character have been sent */
 inline BIT donechar() {
@@ -85,7 +78,7 @@ inline BIT donecode() {
 }
 
 /* Start sending a new character and queue up the next one */
-inline void nextspacecode() {
+void nextspacecode() {
   if (mcode & BIT7)  /* three-unit space between letters */
     mchar = SPACEDASH;
   else
@@ -96,7 +89,7 @@ inline void nextspacecode() {
 }
 
 /* Start sending a new character and queue up the next one */
-inline void nextcode() {
+void nextcode() {
   if (mcode & BIT7)  /* one-unit space between characters */
     mchar = DASH;
   else
@@ -113,47 +106,22 @@ inline BIT nextchar() {
   return (mchar & BIT7) ? 1 : 0 ;
 }
 
+#ifndef DEBUG_MORSE
+
+/* Initialize the Morse code generator */
+inline void inittock() {
+  mchar = ONES;
+  mcode = ONES;
+}
+
 /* Sends a new bit at every call until ring buffer is empty */
-#if DEBUG
-BIT tock() {
-  if (donechar()) {
-    P1OUT |= CHARACTER_START_PIN;     /* DEBUG signal new character */
-    if (donecode()) {
-      P1OUT |= LETTER_START_PIN;      /* DEBUG signal new letter */
-      if (letter >= sizeof(MESSAGE)) { 
-        P1OUT &= ~MESSAGE_START_PIN;  /* DEBUG signal end of message */
-        return 0;
-      } else {
-        if (letter == 0)              /* DEBUG */
-          P1OUT |= MESSAGE_START_PIN; /* DEBUG signal start of message */
-        mcode = ascii2morse(message[letter++]);
-        if (mcode == ONES) {
-          P1OUT |= WORD_START_PIN;    /* DEBUG signal new word */
-          mchar = SPACEWORD;
-        } else {
-          P1OUT &= ~WORD_START_PIN;   /* DEBUG */
-          P1OUT &= ~LETTER_START_PIN; /* DEBUG */
-          nextspacecode();
-        }
-      }
-    } else {
-      P1OUT &= ~WORD_START_PIN;       /* DEBUG */
-      P1OUT &= ~LETTER_START_PIN;     /* DEBUG */
-      nextcode();
-    }
-  } else {                            /* DEBUG */
-    P1OUT &= ~CHARACTER_START_PIN;    /* DEBUG */
-  }
-  return nextchar();
-}
-#else
-BIT tock() {
+BIT tock(ringbuffer* rb) {
   if (donechar()) {
     if (donecode()) {
-      if (letter >= sizeof(MESSAGE)) { 
+      if (rbempty(rb)) { 
         return 0;
       } else {
-        mcode = ascii2morse(message[letter++]);
+        mcode = rbget(rb);
         if (mcode == ONES) {
           mchar = SPACEWORD;
         } else {
@@ -166,4 +134,74 @@ BIT tock() {
   }
   return nextchar();
 }
-#endif
+
+#else  /* DEBUG_MORSE */
+
+static uint8_t debug = ZEROS;
+static uint16_t code_count = 0;
+
+#define DEBUG_MORSE_MASK ((MESSAGE_PIN) | \
+                          (WORD_PIN)    | \
+                          (CODE_PIN)    | \
+                          (CHAR_PIN))
+
+/* Returns debug outputs to be placed in P1OUT */
+uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask) {
+  uint8_t p1out;
+  p1out = P1OUT;
+  /* Duplicate SENDBIT_P1OUT_DEFAULT functionality */
+  if (bit)
+    p1out |= mask;
+  else
+    p1out &= ~mask;
+  /* Add debug bits */
+  if (debug) {
+    /* set debug pins  */
+    p1out |= (debug & DEBUG_MORSE_MASK);
+    debug = ZEROS;
+  } else {
+    /* clear debug pins */
+    p1out &= ~(DEBUG_MORSE_MASK);
+  }
+  return p1out;
+}
+
+/* Initialize the Morse code generator */
+void inittock() {
+  mchar = ONES;
+  mcode = ONES;
+  code_count = 0;
+}
+
+/* Sends a new bit at every call until ring buffer is empty */
+BIT tock(ringbuffer* rb) {
+  if (donechar()) {
+    debug |= CHAR_PIN;          /* DEBUG signal end of character */
+    if (donecode()) {
+      code_count++;             /* DEBUG */
+      debug |= CODE_PIN;        /* DEBUG signal end of code */
+      if (rbempty(rb)) { 
+        code_count = 0;
+        debug |= MESSAGE_PIN;   /* DEBUG signal end of message */
+        return 0;
+      } else {
+        if (code_count == 0)    /* DEBUG */
+          debug |= MESSAGE_PIN; /* DEBUG signal start of message */
+        mcode = rbget(rb);
+        if (mcode == ONES) {
+          debug |= WORD_PIN;    /* DEBUG signal start of word space */
+          mchar = SPACEWORD;
+        } else {
+          debug |= CODE_PIN;    /* DEBUG signal start of code */
+          nextspacecode();
+        }
+      }
+    } else {
+      debug |= CODE_PIN;        /* DEBUG signal start of code */
+      nextcode();
+    }
+  }
+  return nextchar();
+}
+
+#endif  /* DEBUG_MORSE */

@@ -88,7 +88,7 @@ $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $< -o $@
 
 
-prog:
+prog: 
 	mspdebug rf2500 "prog $(ELF)"
 
 

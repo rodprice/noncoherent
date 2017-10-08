@@ -120,6 +120,7 @@
 #define POLY 235
 #define RPOLY 3440
 #define GPOLY 2785
+#define REGLOAD 2048
 #endif
 
 

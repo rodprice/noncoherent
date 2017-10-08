@@ -113,10 +113,12 @@ static const uint8_t morse[MORSE_LUT_SIZE] =
 uint8_t ascii2morse(char ascii);
 
 /* Initialize the Morse code generator */
-void inittock(ringbuffer* rb);
+void inittock();
 
 /* Generate Morse code sequence */
-uint8_t tock();
+uint8_t tock(ringbuffer* rb);
 
+/* Duplicates functionality of SENDBIT while sending to debug pins too */
+uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask);
 
 #endif

@@ -21,32 +21,30 @@
 
 
 /* len must be a power of two, or bad things will happen. */
-ringbuffer rbnew(uint8_t* buf, size_t len) {
-  uint8_t i;
-  ringbuffer rb;
-  rb.buffer = buf;
-  rb.length = len;
-  rbinit(&rb);
-  return rb;
+void rbnew(ringbuffer* rb, uint8_t* buf, uint8_t len) {
+  rb->buffer = buf;
+  rb->length = len;
+  rbinit(rb);
 }
 
-/* This has to be atomic, if rbget or rbput might be running concurrently.  */
+/* This has to be atomic, if rbget or rbput might be running concurrently. */
 void rbinit(ringbuffer* rb) {
+  uint8_t i;
   SR_ALLOC();
   ENTER_CRITICAL();
   rb->head = 0;
   rb->tail = 0;
-  for (i=0; i<len; i++)
-    buf[i] = 0;
+  for (i=0; i<rb->length; i++)
+    rb->buffer[i] = 0;
   EXIT_CRITICAL();
 }
 
 /* ------------------------------------------------------------------------ */
 /* This ring buffer is supposed to be lock-free, but just in case... */
 
-#if DEBUG
+#ifdef DEBUG_RINGBUFFER
 
-inline uint8_t rbfull(ringbuffer* rb) {
+uint8_t rbfull(ringbuffer* rb) {
   uint8_t diff;
   SR_ALLOC();
   ENTER_CRITICAL();
@@ -55,7 +53,7 @@ inline uint8_t rbfull(ringbuffer* rb) {
   return diff;
 }
 
-inline uint8_t rbempty(ringbuffer* rb) {
+uint8_t rbempty(ringbuffer* rb) {
   uint8_t diff;
   SR_ALLOC();
   ENTER_CRITICAL();
@@ -91,13 +89,13 @@ uint8_t rbget(ringbuffer* rb) {
   return data;
 }
 
-#else
+#else  /* DEBUG_RINGBUFFER */
 
-inline uint8_t rbfull(ringbuffer* rb) {
+uint8_t rbfull(ringbuffer* rb) {
   return (rb->head - rb->tail) == rb->length;
 }
 
-inline uint8_t rbempty(ringbuffer* rb) {
+uint8_t rbempty(ringbuffer* rb) {
   return rb->head == rb->tail;
 }
 
@@ -137,4 +135,4 @@ uint8_t rbget(ringbuffer* rb) {
 /*   return data; */
 /* } */
 
-#endif
+#endif  /* DEBUG_RINGBUFFER */
