@@ -16,11 +16,14 @@
    times per second.  A new bit of the m-sequence is sent at every
    interrupt call.  Given these settings, sending a 4095-bit
    m-sequence will take just less than 1 sec. */
-#define MSEQ_TICKS 4            /* 0.25 ms */
+#define MSEQ_TICKS 8            /* 0.25 ms */
+
+/* Defines the number of m-sequences periods to be transmitted */
+#define PERIODS 64
 
 /* Defines the number of bits in the shift register.  Choices
    currently are 3, 4, 5, 6, 7, 8, 10, and 12. */
-#define REGISTER_LENGTH 3
+#define REGISTER_LENGTH 8
 
 
 /**********************************************************************/
@@ -48,8 +51,9 @@
 #define XMIT_PIN BIT2           /* Keys transmitter on or off */
 
 #define EPOCH_PINS BIT7          /* Epoch toggle */
-#define MORSE_PINS (RED_LED_PIN) /* Morse code output */
-#define MSEQ_PINS (XMIT_PIN)     /* M-sequence output */
+#define MORSE_PINS (XMIT_PIN | RED_LED_PIN)  /* Morse code output */
+#define MSEQ_PINS (XMIT_PIN | GREEN_LED_PIN) /* M-sequence output */
+#define TICKER_PIN BIT1          /* ticks when m-sequence starts */
 
 
 /**********************************************************************/
@@ -64,8 +68,13 @@
 
 #define MESSAGE_PIN BIT4
 #define WORD_PIN    BIT5
-#define CODE_PIN    BIT6
+#define CODE_PIN    BIT3
 #define CHAR_PIN    BIT7
+
+#define DEBUG_MORSE_MASK ((MESSAGE_PIN) | \
+                          (WORD_PIN)    | \
+                          (CODE_PIN)    | \
+                          (CHAR_PIN))
 
 inline uint8_t debug_morse_p1out(uint8_t bits);
 
@@ -74,7 +83,6 @@ inline uint8_t debug_morse_p1out(uint8_t bits);
 
 #ifdef DEBUG_MSEQUENCE
 
-#define MSEQ_PIN      BIT5 
 
 #endif  /* DEBUG_MSEQUENCE */
 

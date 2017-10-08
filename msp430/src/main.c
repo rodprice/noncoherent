@@ -10,7 +10,6 @@
 #include "config.h"
 #include "morse.h"
 #include "msequence.h"
-#include "ringbuffer.h"
 
 
 /* Set or clear P1OUT bits in mask */
@@ -35,11 +34,7 @@
 
 static volatile uint32_t clock;  /* real-time clock */
 static volatile uint16_t galois; /* m-sequence shift register */
-
-static uint8_t buffer[RINGSIZE]; /* used by the ringbuffer */
-static ringbuffer ring;          /* queue between main loop and interrupts */
-
-static const char* message = MESSAGE;
+static volatile uint16_t ticker; /* counts periods of m-sequences */
 
 
 /* Start the timer, reset and start the clock */
@@ -66,30 +61,36 @@ inline void mseq_start() {
 /* Stop sending m-sequences */
 inline void mseq_stop() {
   TACCTL0 = 0;                   /* stop mseq_isr() interrupts */
+  P1OUT &= ~(MSEQ_PINS | TICKER_PIN); /* turn out the lights */
 }
 
 /* Start sending Morse code */
 inline void morse_start() {
-  TACCR1 = (MSEQ_TICKS >> 1);   /* Morse code clock rate */
+  TACCR1 = MORSE_TICKS;          /* Morse code clock rate */
   TACCTL1 = CCIE;                /* compare mode, interrupt enabled */
 }
 
 /* Stop sending Morse code */
 inline void morse_stop() {
   TACCTL1 = 0;                   /* stop morse_isr() interrupts */
+  P1OUT &= ~(MORSE_PINS);        /* turn out the lights */
+#ifdef DEBUG_MORSE
+  P1OUT &= ~(DEBUG_MORSE_MASK);  /* don't forget any */
+#endif
 }
 
 /* M-sequence generation */
-/* __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) { */
-/*   TACCR0 += MSEQ_TICKS;          /\* set the next timer period *\/ */
-/*   SENDBIT_P1OUT_DEFAULT( galois & REGLOAD, MSEQ_PINS ); */
-/*   if ((galois & SEQLEN) == REGLOAD) { */
-/*     SENDBIT_P1OUT_DEFAULT( 1, BIT1 ); */
-/*   } else { */
-/*     SENDBIT_P1OUT_DEFAULT( 0, BIT1 ); */
-/*   } */
-/*   galois = galshift(galois);     /\* generate the next bit *\/ */
-/* } */
+__attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
+  TACCR0 += MSEQ_TICKS;          /* set the next timer period */
+  SENDBIT_P1OUT_DEFAULT( galois & REGLOAD, MSEQ_PINS );
+  if ((galois & SEQLEN) == REGLOAD) {
+    ticker++;
+    SENDBIT_P1OUT_DEFAULT( 1, TICKER_PIN );
+  } else {
+    SENDBIT_P1OUT_DEFAULT( 0, TICKER_PIN );
+  }
+  galois = galshift(galois);     /* generate the next bit */
+}
 
 /* Morse code generation and clock */
 __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
@@ -99,7 +100,7 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
       return;
     case TA0IV_TACCR1:          /* Morse interrupt pending */
       TACCR1 += MORSE_TICKS;    /* set the next timer period */
-      SENDBIT_P1OUT( tock(&ring), MORSE_PINS );
+      SENDBIT_P1OUT( tock(), MORSE_PINS );
       return;
     case TA0IV_TAIFG:           /* timer overflow interrupt */
       clock++;                  /* add 2 seconds to clock */
@@ -109,8 +110,6 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
 
 int main(int argc, char *argv[])
 {
-  uint8_t i, code;
-  
   /* Hold the watchdog */
   WDTCTL = WDTPW + WDTHOLD;
   
@@ -133,7 +132,6 @@ int main(int argc, char *argv[])
   
   /* Initialize data structures */
   clock = 0;
-  rbnew(&ring, buffer, sizeof(buffer));
   inittock();                  /* set up Morse code generator */
   galois = REGLOAD;            /* set up m-sequence generator */
   
@@ -142,19 +140,27 @@ int main(int argc, char *argv[])
   __nop();
   
   timer_start();
-  /* mseq_start(); */
   
   /* Send the message repeatedly */
-  while (1)
-    {
-      inittock();
-      morse_start();
-      for (i=0; i<sizeof(MESSAGE); i++) {
-        code = ascii2morse(message[i]);
-        while(rbput(&ring,code));
-      }
-      morse_stop();
-      __delay_cycles(1000000);
-    }
+  while (1) {
+    /* Send my call sign and a short message */
+    inittock();
+    morse_start();
+    while (!donemsg()) { __delay_cycles(1000); }
+    morse_stop();
+    
+    /* Take a breath */
+    __delay_cycles(500000);
+    
+    /* Send m-sequences repeatedly */
+    ticker = 0;
+    galois = REGLOAD;
+    mseq_start();
+    while (ticker < PERIODS) { __delay_cycles(20); }
+    mseq_stop();
+    
+    /* Take a breath */
+    __delay_cycles(500000);
+  }
 }
 

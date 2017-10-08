@@ -8,7 +8,6 @@
 #define MORSE_H
 
 #include <stdint.h>
-#include "ringbuffer.h"
 
 
 /*
@@ -112,11 +111,14 @@ static const uint8_t morse[MORSE_LUT_SIZE] =
 /* Change an ASCII code into a Morse code */
 uint8_t ascii2morse(char ascii);
 
+/* Is it done yet?  Is it done yet?  Is it done yet? */
+uint8_t donemsg();
+
 /* Initialize the Morse code generator */
 void inittock();
 
 /* Generate Morse code sequence */
-uint8_t tock(ringbuffer* rb);
+uint8_t tock();
 
 /* Duplicates functionality of SENDBIT while sending to debug pins too */
 uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask);

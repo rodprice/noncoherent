@@ -62,9 +62,14 @@ REGISTER ascii2morse(char ascii) {
   }
 }
 
+
+static const char message[sizeof(MESSAGE)] = MESSAGE;
+
+
 /* Internal state */
-static REGISTER mcode;  /* the current Morse code being sent */
-static REGISTER mchar;  /* the character being sent */
+static REGISTER mcode;   /* the current Morse code being sent */
+static REGISTER mchar;   /* the character being sent */
+static uint8_t code_ptr; /* points to current letter in message */
 
 
 /* All the bits in the character have been sent */
@@ -75,6 +80,11 @@ inline BIT donechar() {
 /* All the characters in the code have been sent */
 inline BIT donecode() {
   return mcode == ZEROS || mcode == ONES;
+}
+
+/* The entire message has been sent */
+BIT donemsg() {
+  return code_ptr >= sizeof(MESSAGE);
 }
 
 /* Start sending a new character and queue up the next one */
@@ -106,22 +116,23 @@ inline BIT nextchar() {
   return (mchar & BIT7) ? 1 : 0 ;
 }
 
-#ifndef DEBUG_MORSE
-
 /* Initialize the Morse code generator */
 inline void inittock() {
   mchar = ONES;
   mcode = ONES;
+  code_ptr = 0;
 }
 
-/* Sends a new bit at every call until ring buffer is empty */
-BIT tock(ringbuffer* rb) {
+#ifndef DEBUG_MORSE
+
+/* Sends a new bit at every call until message is sent */
+BIT tock() {
   if (donechar()) {
     if (donecode()) {
-      if (rbempty(rb)) { 
+      if (donemsg()) { 
         return 0;
       } else {
-        mcode = rbget(rb);
+        mcode = ascii2morse(message[code_ptr++]);
         if (mcode == ONES) {
           mchar = SPACEWORD;
         } else {
@@ -138,12 +149,6 @@ BIT tock(ringbuffer* rb) {
 #else  /* DEBUG_MORSE */
 
 static uint8_t debug = ZEROS;
-static uint16_t code_count = 0;
-
-#define DEBUG_MORSE_MASK ((MESSAGE_PIN) | \
-                          (WORD_PIN)    | \
-                          (CODE_PIN)    | \
-                          (CHAR_PIN))
 
 /* Returns debug outputs to be placed in P1OUT */
 uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask) {
@@ -166,28 +171,19 @@ uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask) {
   return p1out;
 }
 
-/* Initialize the Morse code generator */
-void inittock() {
-  mchar = ONES;
-  mcode = ONES;
-  code_count = 0;
-}
-
-/* Sends a new bit at every call until ring buffer is empty */
-BIT tock(ringbuffer* rb) {
+/* Sends a new bit at every call until message is sent */
+BIT tock() {
   if (donechar()) {
     debug |= CHAR_PIN;          /* DEBUG signal end of character */
     if (donecode()) {
-      code_count++;             /* DEBUG */
       debug |= CODE_PIN;        /* DEBUG signal end of code */
-      if (rbempty(rb)) { 
-        code_count = 0;
+      if (donemsg()) {
         debug |= MESSAGE_PIN;   /* DEBUG signal end of message */
         return 0;
       } else {
-        if (code_count == 0)    /* DEBUG */
+        if (code_ptr == 0)      /* DEBUG */
           debug |= MESSAGE_PIN; /* DEBUG signal start of message */
-        mcode = rbget(rb);
+        mcode = ascii2morse(message[code_ptr++]);
         if (mcode == ONES) {
           debug |= WORD_PIN;    /* DEBUG signal start of word space */
           mchar = SPACEWORD;
