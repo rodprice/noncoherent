@@ -22,7 +22,7 @@
 
 int main() {
   /* run_through_the_lookup_table(); */
-  /* test_tock(MESSAGE); */
+  test_tock(MESSAGE);
   /* test_galshift(); */
   /* test_fibshift(); */
   /* test_backfibshift(); */

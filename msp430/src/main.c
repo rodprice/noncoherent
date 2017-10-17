@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
     morse_stop();
     
     /* Take a breath */
-    __delay_cycles(500000);
+    __delay_cycles(50000);
     
     /* Send m-sequences repeatedly */
     ticker = 0;

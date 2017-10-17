@@ -2,6 +2,11 @@
 #include "si4432.h"
 
 
+#define SR_ALLOC() uint16_t __sr
+#define ENTER_CRITICAL() __sr = _get_interrupt_state(); __disable_interrupt()
+#define EXIT_CRITICAL() __set_interrupt_state(__sr)
+
+
 void set_radio_state(radiostate state) {
   switch state {
     case READY:
@@ -85,53 +90,93 @@ void init_si4432_rx_modem() {
   spi_write_register(Si4432_AGC_OVERRIDE1,                         0x60);
 }
 
+/* this is an ordinary output pin */
+#define NSEL_PIN BIT0
+/* these are handed over to the USCI_B0 */
+#define SCLK_PIN BIT5
+#define SOMI_PIN BIT6
+#define SIMO_PIN BIT7
 
-/* pseudocode */
-void mcu_init() {
-  // disable watchdog, set up clocks
-  // initialize io ports
-  // set up SPI peripheral
-  // turn off LEDs
+
+/* Set up the B0 USCI to do SPI transfers */
+void spi_init() {
+  __delay_cycles(240000);       /* wait at least 15 ms */
+  
+  /* set up SPI */
+  UCB0CTL1 |= UCSWRST;          /* shut down USCI */
+  
+  /* set up SPI clock */
+  UCB0CTL1 |= UCSSEL1;          /* use SMCLK */
+  UCB0BR1 = 0x01;               /* divide SMCLK by 256 */
+  UCB0BR0 = 0x00;
+  
+  /* running in 3-pin SPI because Si4432 wants 16-bit words */
+  UCB0CTL0 =            \
+    UCCKPH   | UCCKPL | \       /* guessing here */
+    UCMSB    |          \       /* MSB first */
+    ~UC7BIT  |          \       /* 8-bit character length */
+    UCMODE_0 |          \       /* 3-pin SPI */
+    UCSYNC;                     /* synchronous mode */
+  
+  /* P1.5 is SCLK, P2.0 is CS, P1.6 is SOMI, P1.7 is SIMO */
+  P2OUT |= NSEL_PIN;            /* make sure nSEL is high to start */
+  P2DIR |= NSEL_PIN;
+  P1SEL |= ( SCLK_PIN | SOMI_PIN | SIMO_PIN );
+  UCB0CTL1 &= ~UCSWRST;
+
+  /* ready to go */
+  UCB0CTL1 &= ~UCSWRST;
 }
 
-/* spi_write_register(uint8_t reg, uint8_t value) function writes a
- * new value into a register on the radio.  If only one register of
+/* The Si4432 SPI interface reads 16 bits at a time.  Data is clocked
+   into SDI on the rising edge of SCLK, MSB first.
+   UCMODEx = 10 sets the chip select signal active low
+*/
+
+
+/* The spi_write_register(uint8_t reg, uint8_t value) function writes
+ * a new value into a register on the radio.  If only one register of
  * the radio is written, a 16-bit value must be sent to the radio (the
  * 8-bit address of the register followed by the new 8-bit value of
  * the register).  To write a register, the MSB of the address is set
  * to 1 to indicate a device write. */
 
-/* pseudocode */
 void spi_write_register(uint8_t reg, uint8_t value) {
-  // set nSEL pin low (chip select pin)
-  // write register address into SPI
-  SPI1DAT = (reg | 0x80); // important to set MSB
-  // wait until byte is sent
-  // write the value into SPI
-  SPI1DAT = value;
-  // wait until byte is sent
-  // set nSEL pin high (chip select pin)
+  SR_ALLOC();
+  ENTER_CRITICAL();             /* disable interrupts */
+  
+  P2OUT &= ~NSEL_PIN;           /* set nSEL pin low */
+  while(!(IFG2 & UCB0TXIFG));   /* wait for last transmission */
+  UCB0TXBUF = (reg | 0x80);     /* send register address */
+  while(!(IFG2 & UCB0TXIFG));   /* wait for buffer to clear */
+  UCB0TXBUF = value;            /* send value to register */
+  P2OUT |= NSEL_PIN;            /* set nSEL pin high */
+  
+  EXIT_CRITICAL();              /* restore status register */
 }
 
-/* The U8 SpiReadRegister(U8 reg) function reads one register from the
- * radio.  When reading a single register of the radio, a 16 bit value
- * must be sent to the radio (the 8-bit address of the register
- * followed by a dummy 8-bit value).  The radio provides the value of
- * the register during the second byte of the SPI transaction.  Note
- * that it is crucial to clear the MSB of the register address to
- * indicate a read cycle.
+/* The uint8_t spi_read_register(uint8_t reg) function reads one
+ * register from the radio.  When reading a single register of the
+ * radio, a 16 bit value must be sent to the radio (the 8-bit address
+ * of the register followed by a dummy 8-bit value).  The radio
+ * provides the value of the register during the second byte of the
+ * SPI transaction.  Note that it is crucial to clear the MSB of the
+ * register address to indicate a read cycle.
  */
 
-/* pseudocode */
 uint8_t spi_read_register(uint8_t reg) {
-  // set nSEL pin low (chip select pin)
-  // write the register address into SPI
-  SPI1DAT = reg; // important to clear MSB
-  // wait until byte is sent
-  SPI1DAT = 0xFF; // write a dummy byte into SPI
-  // wait until byte is sent
-  // set nSEL pin high (chip select pin)
-  return SPI1DAT;
+  uint8_t value;
+  SR_ALLOC();
+  ENTER_CRITICAL();             /* disable interrupts */
+  
+  P2OUT &= ~NSEL_PIN;           /* set nSEL pin low */
+  while(!(IFG2 & UCB0TXIFG));   /* wait for last transmission */
+  UCB0TXBUF = (reg & 0x7F);     /* send register address */
+  while(IFG2 & UCB0RXIFG);      /* wait for receive buffer to fill */
+  value = UCB0RXBUF;            /* read and save value received */
+  
+  EXIT_CRITICAL();              /* restore status register */
+  return value;
 }
 
 /* pseudocode */
