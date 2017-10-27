@@ -22,17 +22,17 @@
 # print-fc-sections)
 
 
-TARGET_MCU:=msp430g2231
+TARGET_MCU:=msp430g2553
 DEBUG_MCU:=msp430g2553
 
 # Path to the msp430 toolchain
-TOOLCHAIN_ROOT?=/opt/ti/msp430_gcc
+TOOLCHAIN_ROOT?=/opt/ti/mspgcc
 
 # Toolchain variables
 CC:=$(TOOLCHAIN_ROOT)/bin/msp430-elf-gcc
 GDB:=$(TOOLCHAIN_ROOT)/bin/msp430-elf-gdb
 TOOL_INC_DIR:=$(TOOLCHAIN_ROOT)/include
-TOOL_LIB_DIR:=$(TOOLCHAIN_ROOT)/include # linker scripts live in the include dir
+TOOL_LIB_DIR:=$(TOOLCHAIN_ROOT)/include
 
 # Directories
 BUILD_DIR=build

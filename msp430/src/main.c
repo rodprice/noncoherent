@@ -20,6 +20,14 @@
     (P1OUT) &= ~(mask);                 \
   }
 
+/* Set or clear P2OUT bits in mask */
+#define SENDBIT_P2OUT_DEFAULT(bit,mask) \
+  if (bit) {                            \
+    (P2OUT) |= (mask);                  \
+  } else {                              \
+    (P2OUT) &= ~(mask);                 \
+  }
+
 /* Swap in debugging tools as desired */
 #ifdef DEBUG_MORSE
 #define SENDBIT_P1OUT(bit,mask) do { P1OUT = debug_morse_sendbit((bit),(mask)); } while(0)
@@ -134,6 +142,49 @@ int main(int argc, char *argv[])
   clock = 0;
   inittock();                  /* set up Morse code generator */
   galois = REGLOAD;            /* set up m-sequence generator */
+
+  P1OUT |= BIT1;
+  P1DIR |= BIT1;
+  P1SEL  = BIT6 | BIT7 | BIT5;
+  P1SEL2 = BIT6 | BIT7 | BIT5;
+
+  UCB0CTL1 = UCSWRST;
+  UCB0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC; // 3-pin, 8-bit SPI master
+  UCB0CTL1 |= UCSSEL_2; // SMCLK
+  UCB0BR0 |= 60; // /2
+  UCB0BR1 = 0; //
+  /* UCB0MCTL = 0; // No modulation */
+  UCB0CTL1 &= ~UCSWRST; // **Initialize USCI state machine**
+
+  uint8_t received_ch;
+  while (1) {
+    P1OUT &= (~BIT5); // Select Device
+
+    while (!(IFG2 & UCB0TXIFG)); // USCI_A0 TX buffer ready?
+    UCB0TXBUF = 0xAA; // Send 0xAA over SPI to Slave
+    while (!(IFG2 & UCB0RXIFG)); // USCI_A0 RX Received?
+    received_ch = UCB0RXBUF; // Store received data
+    
+    P1OUT |= (BIT5); // Unselect Device
+    
+    __delay_cycles(5000);
+    P1OUT ^= BIT0;
+  }
+    
+  spi_init();
+  while (1) {
+    P1OUT ^= 0x01;              /* blink led */
+    __delay_cycles(5000);
+    /* spi_read_register(0x55); */
+    /* spi_write_register(0x55, 0xAA); */
+    __delay_cycles(5000);
+  }
+  
+  /* Test code for SPI */
+  while (1) {
+    spi_write_register(0x55, 0xAA);
+    __delay_cycles(5000);
+  }
   
   __nop();
   __enable_interrupt();

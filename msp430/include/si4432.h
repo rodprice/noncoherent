@@ -16,6 +16,7 @@
  * 
  */
 
+#include <msp430.h>
 #include <stdint.h>
 
 
@@ -102,7 +103,7 @@
 #define enpreainval BIT5        /* enable invalid preamble detected */
 #define enrssi      BIT4        /* enable RSSI */
 #define enwut       BIT3        /* enable wake-up timer */
-#define enlbd       BIT2        /* enable low battery detect */
+#define enlbd_ie2   BIT2        /* enable low battery detect */
 #define enchiprdy   BIT1        /* enable chip ready (xtal) */
 #define enport      BIT0        /* enable power-on reset */
 
@@ -110,14 +111,14 @@
 /************* Operating mode and function control ************/
 
 #define Si4432_OPERATING_MODE1                     0x07
-#define swres   BIT7            /* software register reset bit */
-#define enlbd   BIT6            /* enable low battery detect */
-#define enwt    BIT5            /* enable wake-up timer */
-#define x32ksel BIT4            /* 32768 Hz crystal select */
-#define txon    BIT3            /* tx on in manual transmit mode */
-#define rxon    BIT2            /* rx on in manual receiver mode */
-#define pllon   BIT1            /* tune mode (PLL is on) */
-#define xton    BIT0            /* ready mode (xtal is on) */
+#define swres       BIT7        /* software register reset bit */
+#define enlbd_mode1 BIT6        /* enable low battery detect */
+#define enwt        BIT5        /* enable wake-up timer */
+#define x32ksel     BIT4        /* 32768 Hz crystal select */
+#define txon        BIT3        /* tx on in manual transmit mode */
+#define rxon        BIT2        /* rx on in manual receiver mode */
+#define pllon       BIT1        /* tune mode (PLL is on) */
+#define xton        BIT0        /* ready mode (xtal is on) */
 
 #define Si4432_OPERATING_MODE2                     0x08
 #define antdiv (BIT7|BIT6|BIT5) /* enable antenna diversity */
