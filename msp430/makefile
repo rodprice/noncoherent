@@ -58,7 +58,7 @@ OBJS:=$(patsubst %.c,$(OBJ_DIR)/%.o,$(notdir $(SRCS)))
 ELF:=$(BIN_DIR)/app.out
 
 # Compile flags
-CFLAGS:= -mmcu=$(TARGET_MCU) -mhwmult=none -c -Wall -Os -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
+CFLAGS:= -mmcu=$(TARGET_MCU) -mhwmult=none -c -Os -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 DEBUG_CFLAGS:= -mmcu=$(DEBUG_MCU) -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wshadow -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 # CFLAGS:= -mmcu=$(TARGET_MCU) -mhwmult=none -c -O0 -g3 -ggdb -gdwarf-2 -Wall -Werror -Wextra -Wshadow -std=gnu90 -Wpedantic -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)
 # DEBUG_CFLAGS:= -mmcu=$(DEBUG_MCU) -c -Wall -std=gnu90 -MMD -I$(INC_DIR) -I$(TOOL_INC_DIR)

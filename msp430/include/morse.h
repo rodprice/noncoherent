@@ -120,7 +120,10 @@ void inittock();
 /* Generate Morse code sequence */
 uint8_t tock();
 
-/* Duplicates functionality of SENDBIT while sending to debug pins too */
-uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask);
+/* Start sending Morse code */
+void morse_start();
+
+/* Stop sending Morse code */
+void morse_stop();
 
 #endif

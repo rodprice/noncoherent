@@ -123,8 +123,6 @@ inline void inittock() {
   code_ptr = 0;
 }
 
-#ifndef DEBUG_MORSE
-
 /* Sends a new bit at every call until message is sent */
 BIT tock() {
   if (donechar()) {
@@ -146,58 +144,13 @@ BIT tock() {
   return nextchar();
 }
 
-#else  /* DEBUG_MORSE */
-
-static uint8_t debug = ZEROS;
-
-/* Returns debug outputs to be placed in P1OUT */
-uint8_t debug_morse_sendbit(uint8_t bit, uint8_t mask) {
-  uint8_t p1out;
-  p1out = P1OUT;
-  /* Duplicate SENDBIT_P1OUT_DEFAULT functionality */
-  if (bit)
-    p1out |= mask;
-  else
-    p1out &= ~mask;
-  /* Add debug bits */
-  if (debug) {
-    /* set debug pins  */
-    p1out |= (debug & DEBUG_MORSE_MASK);
-    debug = ZEROS;
-  } else {
-    /* clear debug pins */
-    p1out &= ~(DEBUG_MORSE_MASK);
-  }
-  return p1out;
+/* Start sending Morse code */
+inline void morse_start() {
+  TACCR1 = MORSE_TICKS;          /* Morse code clock rate */
+  TACCTL1 = CCIE;                /* compare mode, interrupt enabled */
 }
 
-/* Sends a new bit at every call until message is sent */
-BIT tock() {
-  if (donechar()) {
-    debug |= CHAR_PIN;          /* DEBUG signal end of character */
-    if (donecode()) {
-      debug |= CODE_PIN;        /* DEBUG signal end of code */
-      if (donemsg()) {
-        debug |= MESSAGE_PIN;   /* DEBUG signal end of message */
-        return 0;
-      } else {
-        if (code_ptr == 0)      /* DEBUG */
-          debug |= MESSAGE_PIN; /* DEBUG signal start of message */
-        mcode = ascii2morse(message[code_ptr++]);
-        if (mcode == ONES) {
-          debug |= WORD_PIN;    /* DEBUG signal start of word space */
-          mchar = SPACEWORD;
-        } else {
-          debug |= CODE_PIN;    /* DEBUG signal start of code */
-          nextspacecode();
-        }
-      }
-    } else {
-      debug |= CODE_PIN;        /* DEBUG signal start of code */
-      nextcode();
-    }
-  }
-  return nextchar();
+/* Stop sending Morse code */
+inline void morse_stop() {
+  TACCTL1 = 0;                   /* stop morse_isr() interrupts */
 }
-
-#endif  /* DEBUG_MORSE */

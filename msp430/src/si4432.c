@@ -1,10 +1,7 @@
 
+#include "config.h"
 #include "si4432.h"
-
-
-#define SR_ALLOC() uint16_t __sr
-#define ENTER_CRITICAL() __sr = _get_interrupt_state(); __disable_interrupt()
-#define EXIT_CRITICAL() __set_interrupt_state(__sr)
+#include "util.h"
 
 
 void set_radio_state(radiostate state) {
@@ -27,6 +24,22 @@ void set_radio_state(radiostate state) {
     }
 }
 
+
+/* If the microcontroller handles the power-on reset for the entire
+ * application, [we] recommend that a software reset be provided for
+ * the radio every time the microcontroller performs a power-on reset
+ * sequence.  The following code section shows how to perform a soft-
+ * ware reset for the radio and determine when the reset procedure is
+ * finished, allowing the radio to receive SPI commands from the
+ * microcontroller.
+ */
+void si4432_reset() {
+  /* Enable POR interrupt, then do software reset */
+  spi_write_register(Si4432_INTERRUPT_ENABLE2, enport);
+  spi_write_register(Si4432_OPERATING_MODE1, swres);
+  LPM3;                         /* wait for nIRQ interrupt */
+  P1OUT |= READY_LED_PIN;       /* turn on power light */
+}
 
 /* Frequency control stuff */
 void init_si4432_frequency() {
@@ -187,25 +200,6 @@ uint8_t spi_read_register(uint8_t reg) {
 /*   // from the radio from nIRQ.  Check the "ipor" interrupt status bit, */
 /*   // which will be set if POR finished correctly. */
   
-/*   // read interrupt status registers to clear interrupt flags and */
-/*   // release nIRQ pin */
-/*   it_status1 = spi_read_register(0x03); // interrupt status 1 reg */
-/*   it_status2 = spi_read_register(0x04); // interrupt status 1 reg */
-/* } */
-
-/* /\* If the microcontroller handles the power-on reset for the entire */
-/*  * application, [we] recommend that a software reset be provided for */
-/*  * the radio every time the microcontroller performs a power-on reset */
-/*  * sequence.  The following code section shows how to perform a soft- */
-/*  * ware reset for the radio and determine when the reset procedure is */
-/*  * finished, allowing the radio to receive SPI commands from the */
-/*  * microcontroller: */
-/*  *\/ */
-
-/* /\* pseudocode *\/ */
-/* void si4432_reset() { */
-/*   spi_write_register(0x07, 0x80); // operating and function control 1 */
-/*   // wait for chip ready interrupt from the radio, while nIRQ is high */
 /*   // read interrupt status registers to clear interrupt flags and */
 /*   // release nIRQ pin */
 /*   it_status1 = spi_read_register(0x03); // interrupt status 1 reg */

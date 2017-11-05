@@ -72,7 +72,7 @@
 #define itxffsfull BIT6         /* tx FIFO almost full */
 #define itxffaem   BIT5         /* tx FIFO almost empty */
 #define irxffafull BIT4         /* rx FIFO almost full */
-#define iext       BIT3         /* external interuupt */
+#define iext       BIT3         /* external interrupt */
 #define ipksent    BIT2         /* packet sent interrupt */
 #define ipkvalid   BIT1         /* valid packet received */
 #define icrcerror  BIT0         /* CRC error */
@@ -420,12 +420,12 @@ typedef enum {
 } radiostate;
 
 
-void mcu_init();
-void spi_write_register(uint8_t reg, uint8_t value);
-uint8_t spi_read_register(uint8_t reg);
-void si4432_init();
-void si4432_reset();
-void si4432_set_rf_parameters();
-
+void  si4432_reset();
+void  si4432_check_device();
+void  si4432_configure_gpio();
+void  si4432_set_frequency();
+void  si4432_init_rx_modem();
+void  si4432_init_tx_modem();
+  
 
 #endif

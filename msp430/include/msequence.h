@@ -127,5 +127,11 @@
 /* Implements a Galois shift register */
 uint16_t galshift(uint16_t bits);
 
+/* Start sending m-sequences */
+inline void mseq_start();
+
+/* Stop sending m-sequences */
+inline void mseq_stop();
+
 
 #endif
