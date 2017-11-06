@@ -12,6 +12,8 @@
 */
 
 #include <stdint.h>
+#include <msp430.h>
+#include "beacon.h"
 #include "msequence.h"
 
 

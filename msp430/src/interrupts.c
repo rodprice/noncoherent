@@ -5,15 +5,15 @@
 #include <msp430.h>
 
 #include "util.h"
-#include "config.h"
+#include "beacon.h"
 #include "msequence.h"
 #include "morse.h"
 #include "si4432.h"
 
 
-static volatile uint32_t clock;  /* real-time clock */
-static volatile uint16_t galois; /* m-sequence shift register */
-static volatile uint16_t ticker; /* counts periods of m-sequences */
+volatile uint32_t clock;  /* real-time clock */
+volatile uint16_t galois; /* m-sequence shift register */
+volatile uint16_t ticker; /* counts periods of m-sequences */
 
 
 /* M-sequence generation */
@@ -21,7 +21,7 @@ __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
   uint8_t bit;
   TACCR0 += MSEQ_TICKS;          /* set the next timer period */
   bit = galois & REGLOAD;        /* find bit to send */
-  sendbit_port2( bit, XMIT_DATA_PIN ); /* send mseq bit */
+  sendbit_port2( bit, GPIO1_PIN ); /* send mseq bit */
   galois = galshift(galois);     /* generate the next bit */
   if ((galois & SEQLEN) == REGLOAD) { /* at beginning of mseq? */
     ticker++;                    /* increment period count */
@@ -40,7 +40,7 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
       return;
     case TA0IV_TACCR1:          /* Morse interrupt pending */
       TACCR1 += MORSE_TICKS;    /* set the next timer period */
-      SENDBIT_P1OUT( tock(), MORSE_PINS );
+      sendbit_port1( tock(), GPIO1_PIN );
       return;
     case TA0IV_TAIFG:           /* timer overflow interrupt */
       clock++;                  /* add 2 seconds to clock */

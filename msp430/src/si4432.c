@@ -1,5 +1,5 @@
 
-#include "config.h"
+#include "beacon.h"
 #include "si4432.h"
 #include "util.h"
 
@@ -41,8 +41,36 @@ void si4432_reset() {
   P1OUT |= READY_LED_PIN;       /* turn on power light */
 }
 
+/* Check that communication over the SPI bus is taking place */
+void si4432_check_device() {
+  uint8_t type, version;
+  /* Read device type register, check result */
+  type = spi_read_register(Si4432_DEVICE_TYPE);
+  while (type != device_type_code) {
+    P1OUT ^= READY_LED_PIN;     /* if wrong, blink ready light */
+    __delay_cycles(120000);
+  }
+  /* Read device version register, check result */
+  version = spi_read_register(Si4432_VERSION_CODE);
+  while (version != revision_B1) {
+    P1OUT ^= XMIT_LED_PIN;      /* if wrong, blink xmit light */
+    __delay_cycles(120000);
+  }
+}
+
+/* Set up Si4432 GPIO pins for direct mode transmission */
+void si4432_configure_gpio() {
+  spi_write_register(           /* GPIO0 is xmit data clock */
+    Si4432_GPIO_CONFIGURATION0,
+    output_txrx_data_clock );
+  spi_write_register(           /* GPIO1 is xmit data input */
+    Si4432_GPIO_CONFIGURATION1,
+    input_tx_direct_modulation_data );
+  enable_clock_irq();           /* set up MSP430 pins to match */
+}
+
 /* Frequency control stuff */
-void init_si4432_frequency() {
+void si4432_set_frequency() {
   /** Crystal oscillator load capacitance: 12.500 pF */
   spi_write_register( Si4432_OSCILLATOR_LOAD_CAPACITANCE, xlc_mask);
 
@@ -60,7 +88,7 @@ void init_si4432_frequency() {
 
 
 /* Transmitter setup */
-void init_si4432_tx_modem() {
+void si4432_init_tx_modem() {
   /** Transmit power: 20 dBm */
   spi_write_register( Si4432_TX_POWER, txpow_max);
 
@@ -87,7 +115,7 @@ void init_si4432_tx_modem() {
 
 
 /* Receiver setup */
-void init_si4432_rx_modem() {
+void si4432_init_rx_modem() {
   /* trusting SiLab's program here */
   spi_write_register(Si4432_IF_FILTER_BANDWIDTH,                   0x2B);
   spi_write_register(Si4432_AFC_LOOP_GEARSHIFT_OVERRIDE,           0x40);
@@ -102,99 +130,6 @@ void init_si4432_rx_modem() {
   spi_write_register(Si4432_AFC_LIMIT,                             0x1D);
   spi_write_register(Si4432_AGC_OVERRIDE1,                         0x60);
 }
-
-/* this is an ordinary output pin */
-#define NSEL_PIN BIT0
-/* these are handed over to the USCI_B0 */
-#define SCLK_PIN BIT5
-#define SOMI_PIN BIT6
-#define SIMO_PIN BIT7
-
-
-/* Set up the B0 USCI to do SPI transfers */
-void spi_init() {
-  __delay_cycles(240000);       /* wait at least 15 ms */
-  
-  /* set up SPI */
-  UCB0CTL1 = UCSWRST;           /* shut down USCI */
-  
-  /* set up SPI clock */
-  UCB0CTL1 |= UCSSEL1;          /* use SMCLK */
-  UCB0BR1 = 0;                  /* divide SMCLK by 60 */
-  UCB0BR0 = 60;
-  
-  /* running in 3-pin SPI because Si4432 wants 16-bit words */
-  UCB0CTL0 = (           
-    UCCKPH   |                  /* guessing here */
-    UCCKPL   |                  /* guessing here */
-    UCMSB    |                  /* MSB first */
-    UCMODE_0 |                  /* 3-pin SPI */
-    UCSYNC   );                 /* synchronous mode */
-  
-  /* P1.5 is SCLK, P2.0 is CS, P1.6 is SOMI, P1.7 is SIMO */
-  P2OUT |= NSEL_PIN;            /* make sure nSEL is high to start */
-  P2DIR |= NSEL_PIN;
-  P1SEL |= ( SCLK_PIN | SOMI_PIN | SIMO_PIN );
-
-  /* ready to go */
-  UCB0CTL1 &= ~UCSWRST;
-}
-
-/* The Si4432 SPI interface reads 16 bits at a time.  Data is clocked
-   into SDI on the rising edge of SCLK, MSB first.
-   UCMODEx = 10 sets the chip select signal active low
-*/
-
-
-/* The spi_write_register(uint8_t reg, uint8_t value) function writes
- * a new value into a register on the radio.  If only one register of
- * the radio is written, a 16-bit value must be sent to the radio (the
- * 8-bit address of the register followed by the new 8-bit value of
- * the register).  To write a register, the MSB of the address is set
- * to 1 to indicate a device write. */
-
-void spi_write_register(uint8_t reg, uint8_t value) {
-  SR_ALLOC();
-  ENTER_CRITICAL();             /* disable interrupts */
-  
-  P2OUT &= ~NSEL_PIN;           /* set nSEL pin low */
-  while(!(IFG2 & UCB0TXIFG));   /* wait for last transmission */
-  UCB0TXBUF = (reg | 0x80);     /* send register address */
-  while(!(IFG2 & UCB0TXIFG));   /* wait for buffer to clear */
-  UCB0TXBUF = value;            /* send value to register */
-  P2OUT |= NSEL_PIN;            /* set nSEL pin high */
-  
-  EXIT_CRITICAL();              /* restore status register */
-}
-
-/* The uint8_t spi_read_register(uint8_t reg) function reads one
- * register from the radio.  When reading a single register of the
- * radio, a 16 bit value must be sent to the radio (the 8-bit address
- * of the register followed by a dummy 8-bit value).  The radio
- * provides the value of the register during the second byte of the
- * SPI transaction.  Note that it is crucial to clear the MSB of the
- * register address to indicate a read cycle.
- */
-
-uint8_t spi_read_register(uint8_t reg) {
-  uint8_t value;
-  SR_ALLOC();
-  ENTER_CRITICAL();             /* disable interrupts */
-  
-  P2OUT &= ~NSEL_PIN;           /* set nSEL pin low */
-  /* while(!(IFG2 & UCB0TXIFG));   /\* wait for last transmission *\/ */
-  UCB0TXBUF = (reg & 0x7F);     /* send register address */
-  while(IFG2 & UCB0RXIFG);      /* wait for receive buffer to fill */
-  value = UCB0RXBUF;            /* read and save value received */
-  
-  EXIT_CRITICAL();              /* restore status register */
-  return value;
-}
-
-/* /\* pseudocode *\/ */
-/* void si4432_init() { */
-/*   // turn on the radio by setting PWRDN pin low */
-/*   SDN = 0; */
   
 /*   // wait at least 15 ms for POR to complete, or wait for an interrupt */
 /*   // from the radio from nIRQ.  Check the "ipor" interrupt status bit, */

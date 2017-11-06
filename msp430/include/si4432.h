@@ -21,11 +21,11 @@
 
 
 /* Values for frequency deviation 3.75 kHz, 4 kbps data rate, which
-   gives modulation index \beta = 0.9, so Carson's rule, BW =
-   2(\beta+1) f_m = 15 kHz, where fm = 4 kHz.
+   gives modulation index \beta = 0.9, so by Carson's rule, BW =
+   2(\beta+1) f_m = 15 kHz, where f_m = 4 kHz.
  */
 
-// Register names
+/* Register names */
 
 /****************** Status *******************/
 
@@ -128,12 +128,12 @@
 #define ffclrrx BIT1            /* rx FIFO reset/clear */
 #define ffclrtx BIT0            /* tx FIFO reset/clear */
 
-// fiddle with the crystal load capacitance
+/* fiddle with the crystal load capacitance */
 #define Si4432_OSCILLATOR_LOAD_CAPACITANCE         0x09
 #define xtalshift BIT7          /* coarse shift */
 #define xlc_mask  0x7F          /* tuning capacitance */
 
-// fiddle with the clock
+/* fiddle with the clock */
 #define Si4432_UC_OUTPUT_CLOCK                     0x0a
 #define clktl (BIT7|BIT6)       /* clock tail */
 #define enlfc  BIT5             /* enable low frequency clock */
@@ -149,19 +149,19 @@
 
 /************* GPIO configuration ************/
 
-#define Si4432_GPIO_CONFIGURATION0                 0x0b
+#define Si4432_GPIO_CONFIGURATION0            0x0b
 #define pup0 BUT5               /* pull-up resistor enable */
 #define output_power_on_reset                 0x00
 
-#define Si4432_GPIO_CONFIGURATION1                 0x0c
+#define Si4432_GPIO_CONFIGURATION1            0x0c
 #define pup1 BIT5               /* pull-up resistor enable */
 #define output_inverted_power_on_reset        0x00
 
-#define Si4432_GPIO_CONFIGURATION2                 0x0d
+#define Si4432_GPIO_CONFIGURATION2            0x0d
 #define pup2 BIT5               /* pull-up resistor enable */
 #define output_microcontroller_clock          0x00
 
-// the following apply to all GPIO_CONFIGURATIONx registers
+/* the following apply to all GPIO_CONFIGURATIONx registers */
 #define output_wakeup_timer                   0x01
 #define output_low_battery_detect             0x02
 #define input_direct_digital                  0x03
@@ -196,37 +196,37 @@
 #define dio1     BIT1           /* direct i/o for GPIO1 */
 #define dio0     BIT0           /* direct i/o for GPIO0 */
 
-// analog to digital converter
+/* analog to digital converter */
 #define Si4432_ADC_CONFIGURATION                   0x0f
 #define Si4432_ADC_SENSOR_AMP_OFFSET               0x10
 #define Si4432_ADC_VALUE                           0x11
 
-// temperature sensor
+/* temperature sensor */
 #define Si4432_TEMPERATURE_SENSOR_CALIBRATION      0x12
 #define Si4432_TEMPERATURE_VALUE_OFFSET            0x13
 
-// wake-up timer
+/* wake-up timer */
 #define Si4432_WAKEUP_TIMER_PERIOD1                0x14
 #define Si4432_WAKEUP_TIMER_PERIOD2                0x15
 #define Si4432_WAKEUP_TIMER_PERIOD3                0x16
 #define Si4432_WAKEUP_TIMER_VALUE1                 0x17
 #define Si4432_WAKEUP_TIMER_VALUE2                 0x18
 
-// low duty cycle 
+/* low duty cycle  */
 #define Si4432_LDC_MODE_DURATION                   0x19
 
-// battery
+/* battery */
 #define Si4432_LOW_BATTERY_DETECTOR_THRESHOLD      0x1a
 #define Si4432_BATTERY_VOLTAGE_LEVEL               0x1b
 
-// IF filter bandwidth -- see table in AN440
+/* IF filter bandwidth -- see table in AN440 */
 #define Si4432_IF_FILTER_BANDWIDTH                 0x1c
 
-// automatic frequency control
+/* automatic frequency control */
 #define Si4432_AFC_LOOP_GEARSHIFT_OVERRIDE         0x1d
 #define Si4432_AFC_TIMING_CONTROL                  0x1e
 
-// clock recovery
+/* clock recovery */
 #define Si4432_CLOCK_RECOVERY_GEARSHIFT_OVERRIDE   0x1f
 #define Si4432_CLOCK_RECOVERY_OVERSAMPLING_RATIO   0x20
 #define Si4432_CLOCK_RECOVERY_OFFSET2              0x21
@@ -235,24 +235,24 @@
 #define Si4432_CLOCK_RECOVERY_TIMING_LOOP_GAIN1    0x24
 #define Si4432_CLOCK_RECOVERY_TIMING_LOOP_GAIN0    0x25
 
-// Received signal strength indicator
+/* Received signal strength indicator */
 #define Si4432_RSSI                                0x26
 #define Si4432_RSSI_THRESHOLD                      0x27
 
-// antenna diversity
+/* antenna diversity */
 #define Si4432_ANTENNA_DIVERSITY1                  0x28
 #define Si4432_ANTENNA_DIVERSITY2                  0x29
 
-// more automatic frequency control
+/* more automatic frequency control */
 #define Si4432_AFC_LIMIT                           0x2a
 #define Si4432_AFC_CORRECTION_READ                 0x2b
 
-// on-off keyed
+/* on-off keyed */
 #define Si4432_OOK_COUNTER_VALUE_1                 0x2c
 #define Si4432_OOK_COUNTER_VALUE_2                 0x2d
 #define Si4432_SLICER_PEAK_HOLD                    0x2e
 
-// packet stuff
+/* packet stuff */
 #define Si4432_DATA_ACCESS_CONTROL                 0x30
 #define Si4432_EZMAC_STATUS                        0x31
 #define Si4432_HEADER_CONTROL1                     0x32
@@ -299,7 +299,7 @@
 #define Si4432_CHANNEL_FILTER_COEFFICIENT_ADDRESS  0x60
 #define Si4432_CHANNEL_FILTER_COEFFICIENT_VALUE    0x61
 
-// power-on reset 
+/* power-on reset  */
 #define Si4432_CRYSTAL_OSCILLATOR_POR_CONTROL      0x62
 #define internal_power_state_mask (BIT7|BIT6|BIT5)
 #define internal_power_state_lp    0x00
@@ -324,7 +324,7 @@
 #define Si4432_GFSK_FIR_FILTER_COEFFICIENT_ADDRESS 0x6b
 #define Si4432_GFSK_FIR_FILTER_COEFFICIENT_VALUE   0x6c
 
-// transmit power
+/* transmit power */
 #define Si4432_TX_POWER                            0x6d
 #define lna_sw      BIT3        /* lna switch controller */
 #define txpow_mask (BIT2|BIT1|BIT0)
@@ -337,12 +337,12 @@
 #define txpow_02dbm 0x01
 #define txpow_min   0x00        /* minimum transmit power */
 
-// transmission data rate
+/* transmission data rate */
 #define Si4432_TX_DATA_RATE1                       0x6e
 #define Si4432_TX_DATA_RATE0                       0x6f
 /* 8590 decimal, 0x218E in these registers gives 4096.03 kbps */
 
-// modulation
+/* modulation */
 #define Si4432_MODULATION_CONTROL1                 0x70
 #define txdtrtscale BIT5        /* set for data rate < 30kbps */
 #define enphpwdn    BIT4        /* power down packet handler */
@@ -351,7 +351,7 @@
 #define enmanch     BIT1        /* manchester coding enable */
 #define enwhite     BIT0        /* data whitening enabled */
 
-// more modulation
+/* more modulation */
 #define Si4432_MODULATION_CONTROL2                 0x71
 #define tx_data_clock_config_mask (BIT7|BIT6) /* clock source */
 #define tx_data_clock_none 0x00 /* no tx data clock available */
@@ -371,14 +371,14 @@
 #define modtyp_fsk         2    /* frequency-shift keyed */
 #define modtype_gfsk       3    /* gaussian fsk */
 
-// frequency deviation
+/* frequency deviation */
 #define Si4432_FREQUENCY_DEVIATION                 0x72
 
-// frequency offset
+/* frequency offset */
 #define Si4432_FREQUENCY_OFFSET1                   0x73
 #define Si4432_FREQUENCY_OFFSET2                   0x74
 
-// frequency band select
+/* frequency band select */
 #define Si4432_FREQUENCY_BAND                      0x75
 #define sbsel BIT6              /* side band select */
 #define hbsel BIT5              /* high band select */
@@ -386,22 +386,22 @@
 /* Choose sbsel = 1, hbsel = 0, fb = 19, 0x13 for frequency band 430
    MHz.  Then value is (sbsel|0x13) */
 
-// carrier frequency
+/* carrier frequency */
 #define Si4432_NOMINAL_CARRIER_FREQUENCY1          0x76
 #define Si4432_NOMINAL_CARRIER_FREQUENCY0          0x77
 /* Spreadsheet gives fc = 0x76C0 = 30400 => carrier = 434.75 MHz*/
 
-// frequency hopping
+/* frequency hopping */
 #define Si4432_FREQUENCY_HOPPING_CHANNEL           0x79
 #define Si4432_FREQUENCY_HOPPING_STEP_SIZE         0x7a
 
-// tx FIFO 
+/* tx FIFO  */
 #define Si4432_TX_FIFO_CONTROL1                    0x7c
 #define txafthr_mask 0x1F       /* tx FIFO almost full threshold */
 #define Si4432_TX_FIFO_CONTROL2                    0x7d
 #define txaethr_mask 0x1F       /* tx FIFO almost empty threshold */
 
-// rx FIFO
+/* rx FIFO */
 #define Si4432_RX_FIFO_CONTROL                     0x7e
 #define txafthr_mask 0x1F       /* tx FIFO almost full threshold */
 #define Si4432_FIFO_ACCESS                         0x7f

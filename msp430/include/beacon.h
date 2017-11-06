@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #include <msp430.h>
+#include <stdint.h>
 
 
 /**********************************************************************/
@@ -24,10 +25,6 @@
 #define NSEL_PIN      BIT3
 #define NIRQ_PIN      BIT4
 #define SDN_PIN       BIT5
-
-/* Synonyms */
-#define XMIT_DATA_PIN  GPIO0_PIN
-#define XMIT_CLOCK_PIN GPIO1_PIN
 
 
 /**********************************************************************/

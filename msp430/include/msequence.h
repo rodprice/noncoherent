@@ -40,9 +40,6 @@
  */
 
 
-#include "config.h"
-
-
 /* 7-bit sequence */
 #if (REGISTER_LENGTH == 3)
 #define REGLEN 3
@@ -124,14 +121,16 @@
 #endif
 
 
+#include <stdint.h>
+
 /* Implements a Galois shift register */
 uint16_t galshift(uint16_t bits);
 
 /* Start sending m-sequences */
-inline void mseq_start();
+void mseq_start();
 
 /* Stop sending m-sequences */
-inline void mseq_stop();
+void mseq_stop();
 
 
 #endif

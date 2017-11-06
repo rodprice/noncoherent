@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #include "morse.h"
-#include "config.h"
+#include "beacon.h"
 
 
 /* Change these should you ever wish to use 16-bit registers */

@@ -1,13 +1,7 @@
 
-/* SPI functions to read and write from the Si4432 radio chip using
- * the MSP430 hardware SPI, USCI B0.  The hardware is set up to use
- * SMCLK running at 1 MHz, divided by 60 to give the SPI clock a 60
- * usec period.  An 8-bit register address is sent first, followed
- * immediately by either an 8-bit read or write.  The Si4430/31/32
- * data sheet has all the gory details. */
-
 #include <msp430.h>
 #include <stdint.h>
+#include <stddef.h>
 #include "beacon.h"
 #include "util.h"
 
@@ -19,7 +13,7 @@ extern volatile uint32_t clock; /* increments every two seconds */
 /* http://www.simplyembedded.org/tutorials/msp430-configuration/ */
 static int _verify_cal_data(void)
 {
-    size_t len = 62 / 2;
+    uint8_t len = 31;
     uint16_t *data = (uint16_t *) 0x10c2;
     uint16_t crc = 0;
  
@@ -41,6 +35,7 @@ void configure_clocks() {
   /* DCOCTL = CALDCO_8MHZ;        /\* set DCOCLK to 8 MHz from cal data *\/ */
   /* BCSCTL2 = DIVS_3;            /\* set SMCLK to 1 MHZ (divide by 8) *\/ */
   BCSCTL3 |= LFXT1S_0 | XCAP_3; /* ACLK from 32768 Hz crystal, 12.5 pF */
+  __delay_cycles(500000);      /* wait for 32768 Hz oscillator to start */
 }
 
 /* Set up MSP430 I/O pins */
@@ -68,16 +63,18 @@ void enable_nirq() {
 
 /* Enable transmit clock interrupts */
 void enable_clock_irq() {
-  P2IES |= XMIT_CLOCK_PIN;      /* high-to-low requests interrupt */
-  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
-  P2IE |= XMIT_CLOCK_PIN;       /* enable interrupt on pin */
+  P2DIR |= GPIO1_PIN;           /* pin drives Si4432 tx data */
+  P2DIR &= ~GPIO0_PIN;          /* pin accepts Si4423 tx clock */
+  P2IES |= GPIO0_PIN;           /* high-to-low requests interrupt */
+  P2IFG &= ~GPIO0_PIN;          /* clear flag, just in case */
+  P2IE |= GPIO0_PIN;            /* enable interrupt on pin */  
 }
 
 /* Start the timer, reset and start the clock */
 void timer_start() {
-  TACCR0 = 0;                    /* stop the timer */
-  TACTL |= TACLR;                /* set timer count to 0 */
-  clock = 0;                     /* reset the clock */
+  TACCR0 = 0;                   /* stop the timer */
+  TACTL |= TACLR;               /* set timer count to 0 */
+  clock = 0;                    /* reset the clock */
   /* do something with TAIE to enable interrupts */
   TACTL = TASSEL0 | ID0 | MC_2 | TACLR; /* timer source ACLK, continuous mode */
 }
@@ -87,6 +84,14 @@ void timer_stop() {
   TACCR0 = 0;                    /* stop the timer */
   TACTL |= TACLR;                /* set TAR to 0 */
 }
+
+
+/* SPI functions to read and write from the Si4432 radio chip using
+ * the MSP430 hardware SPI, USCI B0.  The hardware is set up to use
+ * SMCLK running at 1 MHz, divided by 60 to give the SPI clock a 60
+ * usec period.  An 8-bit register address is sent first, followed
+ * immediately by either an 8-bit read or write.  The Si4430/31/32
+ * data sheet has all the gory details. */
 
 /* Enable SPI to talk to the radio */
 void enable_spi() {
@@ -108,8 +113,8 @@ void enable_spi() {
   /* set up SPI pins */
   P2OUT |= NSEL_PIN;            /* make sure nSEL is high to start */
   P2DIR |= NSEL_PIN;
-  P1SEL  |= ( SCLK_PIN | SOMI_PIN | SIMO_PIN );
-  P1SEL2 |= ( SCLK_PIN | SOMI_PIN | SIMO_PIN );
+  P1SEL  |= ( SCK_PIN | SDO_PIN | SDI_PIN );
+  P1SEL2 |= ( SCK_PIN | SDO_PIN | SDI_PIN );
 
   /* ready to go */
   UCB0CTL1 &= ~UCSWRST;
@@ -194,7 +199,10 @@ int main(int argc, char *argv[])
   si4432_set_frequency();
   si4432_init_rx_modem();
   si4432_init_tx_modem();
-  
+
+  __nop();
   __enable_interrupt();
-  LPM3;                         /* sleep */
+  while (1) {
+    LPM3;                       /* sleep */
+  }
 }
