@@ -420,12 +420,12 @@ typedef enum {
 } radiostate;
 
 
-void  si4432_reset();
-void  si4432_check_device();
-void  si4432_configure_gpio();
-void  si4432_set_frequency();
-void  si4432_init_rx_modem();
-void  si4432_init_tx_modem();
-  
+void si4432_reset();
+void si4432_check_device();
+void si4432_configure_gpio();
+void si4432_set_frequency();
+void si4432_init_rx_modem();
+void si4432_init_tx_modem();
+void si4432_set_state(radiostate state);  
 
 #endif

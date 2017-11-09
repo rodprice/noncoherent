@@ -4,41 +4,20 @@
 #include "util.h"
 
 
-void set_radio_state(radiostate state) {
-  switch (state) {
-    case READY:
-      /* tear down, set up stuff */
-      spi_write_register(Si4432_OPERATING_MODE1, xton);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    case XMIT:
-      /* tear down, set up stuff */
-      spi_write_register(Si4432_OPERATING_MODE1, txon);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    case RECV:
-      /* tear down, set up stuff */
-      spi_write_register(Si4432_OPERATING_MODE1, rxon);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    }
-}
-
-
-/* If the microcontroller handles the power-on reset for the entire
- * application, [we] recommend that a software reset be provided for
- * the radio every time the microcontroller performs a power-on reset
- * sequence.  The following code section shows how to perform a soft-
- * ware reset for the radio and determine when the reset procedure is
- * finished, allowing the radio to receive SPI commands from the
- * microcontroller.
- */
+/* There's a chicken and egg thing going on here.  If you wait for the
+   nIRQ pin to go high, as the documentation says, you will wait
+   forever, because the nIRQ pin won't go high until you read the
+   interrupt status registers.  If, however, you read the status
+   registers right away, you'll never read anything, because the
+   Si4432 is still in reset.  For that reason, I'll just wait. */
 void si4432_reset() {
-  /* Enable POR interrupt, then do software reset */
-  spi_write_register(Si4432_INTERRUPT_ENABLE2, enport);
+  volatile uint8_t value;
   spi_write_register(Si4432_OPERATING_MODE1, swres);
-  LPM3;                         /* wait for nIRQ interrupt */
-  P1OUT |= READY_LED_PIN;       /* turn on power light */
+  __delay_cycles(120000);
+  value = spi_read_register(Si4432_INTERRUPT_STATUS1);
+  value = spi_read_register(Si4432_INTERRUPT_STATUS2);
+  if (value | ipor)
+    P1OUT |= READY_LED_PIN;       /* turn on power light */
 }
 
 /* Check that communication over the SPI bus is taking place */
@@ -66,7 +45,9 @@ void si4432_configure_gpio() {
   spi_write_register(           /* GPIO1 is xmit data input */
     Si4432_GPIO_CONFIGURATION1,
     input_tx_direct_modulation_data );
-  enable_clock_irq();           /* set up MSP430 pins to match */
+  spi_write_register(           /* GPIO2 is recv data output */
+    Si4432_GPIO_CONFIGURATION2,
+    output_rx_data );
 }
 
 /* Frequency control stuff */
@@ -89,12 +70,12 @@ void si4432_set_frequency() {
 
 /* Transmitter setup */
 void si4432_init_tx_modem() {
-  /** Transmit power: 20 dBm */
-  spi_write_register( Si4432_TX_POWER, txpow_max);
+  /** Transmit power: ?? dBm */
+  spi_write_register( Si4432_TX_POWER, txpow_min | lna_sw );
 
   /** Transmit data rate: 4096 bps */
   spi_write_register( Si4432_TX_DATA_RATE1, 0x21); /* 0x218E = 8590 */
-  spi_write_register( Si4432_TX_DATA_RATE1, 0x8E); /* gives 4096.03 bps */
+  spi_write_register( Si4432_TX_DATA_RATE0, 0x8E); /* gives 4096.03 bps */
 
   /** Transmit mode: direct mode, clock and data on GPIO */
   spi_write_register( Si4432_MODULATION_CONTROL1, \
@@ -109,8 +90,6 @@ void si4432_init_tx_modem() {
   /* Value of 8 with data rate 4096 bps gives modulation index beta =
      1.22, which by Carson's law gives BW = 2*(beta+1)*rate = 18,192
      Hz.  Remember to set freq_deviation_msb = 0 */
-
-  /* TODO: setup GPIO pins for xmit data and clock */
 }
 
 
@@ -131,15 +110,36 @@ void si4432_init_rx_modem() {
   spi_write_register(Si4432_AGC_OVERRIDE1,                         0x60);
 }
   
-/*   // wait at least 15 ms for POR to complete, or wait for an interrupt */
-/*   // from the radio from nIRQ.  Check the "ipor" interrupt status bit, */
-/*   // which will be set if POR finished correctly. */
-  
-/*   // read interrupt status registers to clear interrupt flags and */
-/*   // release nIRQ pin */
-/*   it_status1 = spi_read_register(0x03); // interrupt status 1 reg */
-/*   it_status2 = spi_read_register(0x04); // interrupt status 1 reg */
-/* } */
+
+void si4432_set_state(radiostate state) {
+  switch (state) {
+    case READY:
+      /* tear down, set up stuff */
+      P1OUT |= RXON_PIN | TXON_PIN; /* turn off recv and xmit */
+      P1OUT &= ~XMIT_LED_PIN;   /* turn off transmit light */
+      spi_write_register(Si4432_OPERATING_MODE1, xton);
+      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+      break;
+    case XMIT:
+      /* tear down, set up stuff */
+      spi_write_register( Si4432_TX_POWER, txpow_min | lna_sw );
+      P1OUT |= RXON_PIN;        /* turn off receiver */
+      P1OUT &= ~TXON_PIN;       /* turn on transmitter */
+      P1OUT |= XMIT_LED_PIN;    /* turn on transmit light */
+      spi_write_register(Si4432_OPERATING_MODE1, txon);
+      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+      break;
+    case RECV:
+      /* tear down, set up stuff */
+      P1OUT &= ~RXON_PIN;       /* turn on receiver */
+      P1OUT |= TXON_PIN;        /* turn off transmitter */
+      P1OUT &= ~XMIT_LED_PIN;   /* turn off transmit light */
+      spi_write_register(Si4432_OPERATING_MODE1, rxon);
+      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+      break;
+    }
+}
+
 
 /* /\* The following section sets the basic RF parameters needed to do */
 /*  * OOK, FSK, or GFSK modulated packet transmission. These parameters */
@@ -165,6 +165,19 @@ void si4432_init_rx_modem() {
 /*    * below 30 kbps.  The MSB of the deviation setting can be found in */
 /*    * the Modulation Mode Control register 2 (fd[8] -- bit2). *\/ */
 /* } */
+
+/* RadioHead packet format */
+/// \par Packet Format
+///
+/// All messages sent and received by this Driver must conform to this packet format:
+///
+/// - 8 nibbles (4 octets) PREAMBLE
+/// - 2 octets SYNC 0x2d, 0xd4
+/// - 4 octets HEADER: (TO, FROM, ID, FLAGS)
+/// - 1 octet LENGTH (0 to 255), number of octets in DATA
+/// - 0 to 255 octets DATA
+/// - 2 octets CRC computed with CRC16(IBM), computed on HEADER, LENGTH and DATA
+///
 
 /* /\* Packet structure: */
 /*  * programmable preamble (up to 255 bytes) */

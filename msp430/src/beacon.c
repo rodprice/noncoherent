@@ -3,10 +3,12 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "beacon.h"
+#include "si4432.h"
 #include "util.h"
 
 
-extern volatile uint32_t clock; /* increments every two seconds */
+extern volatile uint32_t clock;  /* increments every two seconds */
+extern volatile uint8_t aticker; /* counts audio tone half-periods */
 
 
 /* Read calibration data from TLV, verify checksum */
@@ -29,11 +31,11 @@ static int _verify_cal_data(void)
 void configure_clocks() {
   WDTCTL = WDTPW + WDTHOLD;    /* hold the watchdog */
   DCOCTL = 0;                  /* set DCO clock to lowest setting */
-  BCSCTL1 = CALBC1_1MHZ;       /* set MCLK to 1 MHz from cal data */
-  DCOCTL = CALDCO_1MHZ;        /* set DCOCLK to 1 MHz from cal data */
-  /* BCSCTL1 = CALBC1_8MHZ;       /\* set MCLK to 8 MHz from cal data *\/ */
-  /* DCOCTL = CALDCO_8MHZ;        /\* set DCOCLK to 8 MHz from cal data *\/ */
-  /* BCSCTL2 = DIVS_3;            /\* set SMCLK to 1 MHZ (divide by 8) *\/ */
+  /* BCSCTL1 = CALBC1_1MHZ;       /\* set MCLK to 1 MHz from cal data *\/ */
+  /* DCOCTL = CALDCO_1MHZ;        /\* set DCOCLK to 1 MHz from cal data *\/ */
+  BCSCTL1 = CALBC1_8MHZ;       /* set MCLK to 8 MHz from cal data */
+  DCOCTL = CALDCO_8MHZ;        /* set DCOCLK to 8 MHz from cal data */
+  BCSCTL2 = DIVS_3;            /* set SMCLK to 1 MHZ (divide by 8) */
   BCSCTL3 |= LFXT1S_0 | XCAP_3; /* ACLK from 32768 Hz crystal, 12.5 pF */
   __delay_cycles(500000);      /* wait for 32768 Hz oscillator to start */
 }
@@ -41,7 +43,11 @@ void configure_clocks() {
 /* Set up MSP430 I/O pins */
 void configure_pins() {
   /* Port 1 pins */
-  P1OUT = 0;                   /* all pins set low */
+  P1REN = BUTTON_PIN;          /* set pullup resistor on button */
+  P1OUT =         (
+    BUTTON_PIN    |            /* pull up, not down */
+    TXON_PIN      |            /* high turns transmitter off */
+    RXON_PIN      );           /* high turns receiver off */
   P1DIR =         (            /* BUTTON_PIN and SDO_PIN are inputs */
     XMIT_LED_PIN  |            /* transmit light off */
     READY_LED_PIN |            /* power/ready light off */
@@ -56,18 +62,33 @@ void configure_pins() {
 
 /* Enable interrupts on the nIRQ pin */
 void enable_nirq() {
+  P2DIR &= ~NIRQ_PIN;           /* set direction to input */
   P2IES |= NIRQ_PIN;            /* high-to-low requests interrupt */
   P2IFG &= ~NIRQ_PIN;           /* clear flag, just in case */
-  P2IE |= NIRQ_PIN;             /* enable interrupt on pin */
+  P2IE  |= NIRQ_PIN;            /* enable interrupt on pin */
 }
 
-/* Enable transmit clock interrupts */
+/* Enable interrupts from the radio for direct mode transmission */
 void enable_clock_irq() {
-  P2DIR |= GPIO1_PIN;           /* pin drives Si4432 tx data */
-  P2DIR &= ~GPIO0_PIN;          /* pin accepts Si4423 tx clock */
-  P2IES |= GPIO0_PIN;           /* high-to-low requests interrupt */
-  P2IFG &= ~GPIO0_PIN;          /* clear flag, just in case */
-  P2IE |= GPIO0_PIN;            /* enable interrupt on pin */  
+  P2DIR |= XMIT_DATA_PIN;       /* pin drives Si4432 tx data */
+  P2DIR &= ~RECV_DATA_PIN;      /* pin accepts Si4432 rx data */
+  P2DIR &= ~XMIT_CLOCK_PIN;     /* pin accepts Si4423 tx clock */
+  P2IES |= XMIT_CLOCK_PIN;      /* high-to-low requests interrupt */
+  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
+  P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
+}
+
+void xmit_start() {
+  aticker = AUDIO_TICKS;        /* start the audio clock */
+  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
+  P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
+  si4432_set_state(XMIT);       /* start transmitting */
+}
+
+void xmit_stop() {
+  si4432_set_state(READY);      /* stop transmitting */
+  P2IE  &= ~XMIT_CLOCK_PIN;     /* disable interrupt on pin */  
+  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
 }
 
 /* Start the timer, reset and start the clock */
@@ -141,7 +162,7 @@ void spi_write_register(uint8_t reg, uint8_t data) {
   while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
   value = UCB0RXBUF;            /* read receive buffer */
 
-  __delay_cycles(60);           /* keep nSEL low past end of SCLK */
+  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 }
@@ -169,7 +190,7 @@ uint8_t spi_read_register(uint8_t reg) {
   while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
   value = UCB0RXBUF;            /* read data from receive buffer */
 
-  __delay_cycles(60);           /* keep nSEL low past end of SCLK */
+  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 
@@ -190,7 +211,6 @@ int main(int argc, char *argv[])
 {
   configure_clocks();
   configure_pins();
-  enable_nirq();
   enable_spi();
 
   si4432_reset();
@@ -200,8 +220,16 @@ int main(int argc, char *argv[])
   si4432_init_rx_modem();
   si4432_init_tx_modem();
 
+  enable_nirq();
+  enable_clock_irq();
+
   __nop();
   __enable_interrupt();
+
+  xmit_start();
+  __delay_cycles(40000);
+  xmit_stop();
+  
   while (1) {
     LPM3;                       /* sleep */
   }

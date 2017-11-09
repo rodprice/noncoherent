@@ -19,7 +19,7 @@
 
 /* M-sequence shift register */
 extern volatile uint16_t galois;
-extern volatile uint16_t ticker;
+extern volatile uint16_t mticker;
 
 
 /* Implements a Galois shift register */
@@ -31,7 +31,7 @@ uint16_t galshift(uint16_t bits) {
 
 /* Start sending m-sequences */
 inline void mseq_start() {
-  ticker = 0;                   /* start count of mseq periods */
+  mticker = 0;                  /* start count of mseq periods */
   galois = REGLOAD;             /* initialize shift register */
   TACCR0 = MSEQ_TICKS;          /* m-sequence clock rate */
   TACCTL0 = CCIE;               /* compare mode, interrupt enabled */

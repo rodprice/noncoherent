@@ -26,6 +26,24 @@
 #define NIRQ_PIN      BIT4
 #define SDN_PIN       BIT5
 
+/* Synonyms */
+#define XMIT_CLOCK_PIN GPIO0_PIN /* transmit clock from radio */
+#define XMIT_DATA_PIN  GPIO1_PIN /* transmit data to radio */
+#define RECV_DATA_PIN  GPIO2_PIN /* receive data from radio */
+
+
+/**********************************************************************/
+/* Radio output */
+
+/* Generates an FM tone by toggling the frequency of the transmitter
+   at fixed intervals.  An FSK transmitter sends one frequency for a
+   one and another for a zero, so we send ones for a TONE_PERIOD,
+   then zeros for a TONE_PERIOD, and so on.  The resulting modulation
+   is a square wave, but using GFSK rather than FSK should soften
+   that into something approximating a pure audio tone. */
+
+#define AUDIO_TICKS 4           /* 4096/(2*4) = 512 Hz */
+
 
 /**********************************************************************/
 /* m sequence */
