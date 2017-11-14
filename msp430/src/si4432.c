@@ -13,7 +13,7 @@
 void si4432_reset() {
   volatile uint8_t value;
   spi_write_register(Si4432_OPERATING_MODE1, swres);
-  __delay_cycles(120000);
+  __delay_cycles(80000);        /* 10 ms delay is 20x max in data sheet */
   value = spi_read_register(Si4432_INTERRUPT_STATUS1);
   value = spi_read_register(Si4432_INTERRUPT_STATUS2);
   if (value | ipor)
@@ -67,11 +67,10 @@ void si4432_set_frequency() {
   spi_write_register( Si4432_FREQUENCY_HOPPING_CHANNEL,   0);
 }
 
-
 /* Transmitter setup */
-void si4432_init_tx_modem() {
+void si4432_init_tx_tone() {
   /** Transmit power: ?? dBm */
-  spi_write_register( Si4432_TX_POWER, txpow_min | lna_sw );
+  spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
 
   /** Transmit data rate: 4096 bps */
   spi_write_register( Si4432_TX_DATA_RATE1, 0x21); /* 0x218E = 8590 */
@@ -87,57 +86,142 @@ void si4432_init_tx_modem() {
 
   /** Frequency deviation: 5000 Hz, BW = 18192 Hz by Carson's rule */
   spi_write_register( Si4432_FREQUENCY_DEVIATION, 8); 
-  /* Value of 8 with data rate 4096 bps gives modulation index beta =
-     1.22, which by Carson's law gives BW = 2*(beta+1)*rate = 18,192
-     Hz.  Remember to set freq_deviation_msb = 0 */
 }
 
+void si4432_init_tx_packet() {
+  /** Transmit power: ?? dBm */
+  spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
 
-/* Receiver setup */
-void si4432_init_rx_modem() {
-  /* trusting SiLab's program here */
+  /** Transmit data rate: 2000 bps */
+  spi_write_register( Si4432_TX_DATA_RATE1, 0x10); /* 0x1062 = 4194 */
+  spi_write_register( Si4432_TX_DATA_RATE0, 0x62); /* gives 1999.8 bps */
+
+  /** Transmit mode: FIFO mode, GFSK modulation */
+  spi_write_register( Si4432_MODULATION_CONTROL1,
+                      txdtrtscale           | /* data rate < 30 kbps */
+                      manppol               | /* sets preamble polarity */
+                      enmaninv );             /* preamble bits inverted */
+  spi_write_register( Si4432_MODULATION_CONTROL2,
+                      tx_data_clock_none    | /* data clock not available */
+                      dtmod_fifo            | /* FIFO mode */
+                      modtype_gfsk );         /* GFSK modulation */
+
+  /** Frequency deviation: 5000 Hz, BW = 14 kHz by Carson's rule */
+  spi_write_register( Si4432_FREQUENCY_DEVIATION, 8); 
+}
+
+/* Set up to receive 2 kbps, 5 kHz deviation packets */
+void si4432_init_rx_packet() {
+  /* IF_FILTER_BANDWIDTH: */
+  /* dwn3_bypass = 0, ndec_exp = 2, filset = 0xB = 11 */
+  /* decimate by 2^2 = 4, filset = 1 gives 18.9 kHz bandwidth */
+  /* decimate by 2^2 = 4, filset = 11 not in table, may give 120 kHz bandwidth! */
   spi_write_register(Si4432_IF_FILTER_BANDWIDTH,                   0x2B);
-  spi_write_register(Si4432_AFC_LOOP_GEARSHIFT_OVERRIDE,           0x40);
-  spi_write_register(Si4432_AFC_TIMING_CONTROL,                    0x0A);
   spi_write_register(Si4432_CLOCK_RECOVERY_GEARSHIFT_OVERRIDE,     0x03);
-  spi_write_register(Si4432_CLOCK_RECOVERY_OVERSAMPLING_RATIO,     0xFA);
-  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET2,                0x00);
-  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET1,                0x83);
-  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET0,                0x12);
+  spi_write_register(Si4432_CLOCK_RECOVERY_OVERSAMPLING_RATIO,     0xF4);
+  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET2,                0x20);
+  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET1,                0x41);
+  spi_write_register(Si4432_CLOCK_RECOVERY_OFFSET0,                0x89);
   spi_write_register(Si4432_CLOCK_RECOVERY_TIMING_LOOP_GAIN1,      0x01);
   spi_write_register(Si4432_CLOCK_RECOVERY_TIMING_LOOP_GAIN0,      0x1A);
-  spi_write_register(Si4432_AFC_LIMIT,                             0x1D);
+  spi_write_register(Si4432_OOK_COUNTER_VALUE_1,                   0x40);
+  spi_write_register(Si4432_OOK_COUNTER_VALUE_2,                   0x0A);
+  spi_write_register(Si4432_SLICER_PEAK_HOLD,                      0x1D);
+  spi_write_register(Si4432_CHARGE_PUMP_CURRENT_TRIMMING,          0x80);
+  /* AGC_OVERRIDE1: read out AGC control from bits [4:0] */
   spi_write_register(Si4432_AGC_OVERRIDE1,                         0x60);
+  spi_write_register(Si4432_AFC_LOOP_GEARSHIFT_OVERRIDE,           0x40);
+  spi_write_register(Si4432_AFC_TIMING_CONTROL,                    0x0A);
+  spi_write_register(Si4432_AFC_LIMIT,                             0x1D);
 }
-  
 
+void si4432_packet_config() {
+  /* uint8_t tx_fifo_almost_full = ; */
+  /* spi_write_register(Si4432_TX_FIFO_CONTROL1, rxafthr_mask); */
+  uint8_t tx_fifo_almost_empty = 4; /* threshold for txffaam interrupt */
+  uint8_t rx_fifo_almost_full = 55; /* threshold for rxffafull interrupt */
+  spi_write_register(Si4432_TX_FIFO_CONTROL2, tx_fifo_almost_empty);
+  spi_write_register(Si4432_RX_FIFO_CONTROL, rx_fifo_almost_full);
+  spi_write_register(Si4432_DATA_ACCESS_CONTROL,
+                     enpacrx    | /* automatic rx packet handling */
+                     enpactx    | /* automatic tx packet handling */
+                     encrc      | /* check CRC against data fields only */
+                     crc_ibm_16 ); /* use IBM 16 CRC polynomial */
+  uint8_t bcen = 0x80;            /* broadcast address check enable */
+  uint8_t hdch = 0x08;            /* received header bytes to be checked */
+  spi_write_register(Si4432_HEADER_CONTROL1, bcen | hdch);
+  spi_write_register(Si4432_PREAMBLE_LENGTH, 8); /* set preamble length */
+  spi_write_register(Si4432_SYNC_WORD3, 0x2D);   /* first sync byte */
+  spi_write_register(Si4432_SYNC_WORD2, 0xD4);   /* second sync byte */
+  /* RadioHead doesn't set these!  Hope this is right */
+  spi_write_register(Si4432_SYNC_WORD1, 0x00);
+  spi_write_register(Si4432_SYNC_WORD0, 0x00);
+  spi_write_register(Si4432_HEADER_CONTROL2, 0x22); /* por default value */
+  uint8_t promiscuous = 0xFF;   /* this is por default */
+  spi_write_register(Si4432_HEADER_ENABLE3, promiscuous);
+  /* RadioHead doesn't set these!  Hope this is right */
+  spi_write_register(Si4432_HEADER_ENABLE2, promiscuous);
+  spi_write_register(Si4432_HEADER_ENABLE1, promiscuous);
+  spi_write_register(Si4432_HEADER_ENABLE0, promiscuous);
+}
+
+void si4432_load_packet(uint8_t *data, uint8_t len) {
+  /* reset and clear FIFO */
+  spi_write_register(Si4432_OPERATING_MODE2, ffclrtx);
+  spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+  /* load up the xmit FIFO */
+  spi_write_register(Si4432_PACKET_LENGTH, len);
+  spi_burst_write(Si4432_FIFO_ACCESS, data, len);
+  spi_write_register(Si4432_PREAMBLE_LENGTH, 8); /* set preamble length */
+  /* enable packet sent interrupt, disable others */
+  spi_write_register(Si4432_INTERRUPT_ENABLE1, enpksent);
+  spi_write_register(Si4432_INTERRUPT_ENABLE2, 0x00);
+  /* clear any pending interrupts */
+  spi_read_register(Si4432_INTERRUPT_STATUS1);
+  spi_read_register(Si4432_INTERRUPT_STATUS2);
+}
+
+/* Set Si4432 chip state, turn on/off transmitter and receiver */
 void si4432_set_state(radiostate state) {
   switch (state) {
-    case READY:
-      /* tear down, set up stuff */
-      P1OUT |= RXON_PIN | TXON_PIN; /* turn off recv and xmit */
-      P1OUT &= ~XMIT_LED_PIN;   /* turn off transmit light */
-      spi_write_register(Si4432_OPERATING_MODE1, xton);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    case XMIT:
-      /* tear down, set up stuff */
-      spi_write_register( Si4432_TX_POWER, txpow_min | lna_sw );
-      P1OUT |= RXON_PIN;        /* turn off receiver */
-      P1OUT &= ~TXON_PIN;       /* turn on transmitter */
-      P1OUT |= XMIT_LED_PIN;    /* turn on transmit light */
-      spi_write_register(Si4432_OPERATING_MODE1, txon);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    case RECV:
-      /* tear down, set up stuff */
-      P1OUT &= ~RXON_PIN;       /* turn on receiver */
-      P1OUT |= TXON_PIN;        /* turn off transmitter */
-      P1OUT &= ~XMIT_LED_PIN;   /* turn off transmit light */
-      spi_write_register(Si4432_OPERATING_MODE1, rxon);
-      spi_write_register(Si4432_OPERATING_MODE2, 0x00);
-      break;
-    }
+  case READY:
+    P1OUT |= RXON_PIN | TXON_PIN; /* turn off recv and xmit */
+    P1OUT &= ~XMIT_LED_PIN;       /* turn off transmit light */
+    spi_write_register(Si4432_OPERATING_MODE1, xton);
+    spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+    break;
+  case XMIT_TONE:
+    si4432_init_tx_tone();
+    spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
+    P1OUT |= RXON_PIN;          /* turn off receiver */
+    P1OUT &= ~TXON_PIN;         /* turn on transmitter */
+    P1OUT |= XMIT_LED_PIN;      /* turn on transmit light */
+    spi_write_register(Si4432_OPERATING_MODE1, txon | xton);
+    spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+    break;
+  case XMIT_PACKET:
+    si4432_init_tx_packet();
+    spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
+    P1OUT |= RXON_PIN;          /* turn off receiver */
+    P1OUT &= ~TXON_PIN;         /* turn on transmitter */
+    P1OUT |= XMIT_LED_PIN;      /* turn on transmit light */
+    spi_write_register(Si4432_OPERATING_MODE1, txon | xton);
+    LPM3;                       /* sleep until done */
+    break;
+  case RECV_TONE:
+    /* unimplemented, probably won't */
+    si4432_set_state(READY);
+    break;
+  case RECV_PACKET:
+    /* not yet tested */
+    si4432_init_rx_packet();
+    P1OUT &= ~RXON_PIN;         /* turn on receiver */
+    P1OUT |= TXON_PIN;          /* turn off transmitter */
+    P1OUT &= ~XMIT_LED_PIN;     /* turn off transmit light */
+    spi_write_register(Si4432_OPERATING_MODE1, rxon | xton);
+    LPM3;                       /* sleep until done */
+    break;
+  }
 }
 
 

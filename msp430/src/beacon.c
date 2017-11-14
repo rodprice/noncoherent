@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "beacon.h"
+#include "spi.h"
 #include "si4432.h"
 #include "util.h"
 
@@ -68,6 +69,12 @@ void enable_nirq() {
   P2IE  |= NIRQ_PIN;            /* enable interrupt on pin */
 }
 
+void disable_nirq() {
+  P2IFG &= ~NIRQ_PIN;           /* clear flag, just in case */
+  P2IE  &= ~NIRQ_PIN;           /* disable interrupt on pin */
+  P2IFG &= ~NIRQ_PIN;           /* clear flag, just in case */
+}
+
 /* Enable interrupts from the radio for direct mode transmission */
 void enable_clock_irq() {
   P2DIR |= XMIT_DATA_PIN;       /* pin drives Si4432 tx data */
@@ -78,17 +85,29 @@ void enable_clock_irq() {
   P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
 }
 
-void xmit_start() {
+void xmit_tone_start() {
   aticker = AUDIO_TICKS;        /* start the audio clock */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
-  P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
-  si4432_set_state(XMIT);       /* start transmitting */
+  P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */
+  si4432_set_state(XMIT_TONE);  /* start transmitting */
 }
 
-void xmit_stop() {
+void xmit_tone_stop() {
   si4432_set_state(READY);      /* stop transmitting */
   P2IE  &= ~XMIT_CLOCK_PIN;     /* disable interrupt on pin */  
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
+}
+
+void xmit_packet_start() {
+  P2IFG &= ~NIRQ_PIN;           /* clear flag, just in case */
+  P2IE  |= NIRQ_PIN;            /* enable interrupt on pin */
+  si4432_set_state(XMIT_PACKET); /* start transmitting */
+}
+
+void xmit_packet_stop() {
+  si4432_set_state(READY);      /* stop transmitting */
+  P2IE  &= ~NIRQ_PIN;           /* disable interrupt on pin */  
+  P2IFG &= ~NIRQ_PIN;           /* clear flag, just in case */
 }
 
 /* Start the timer, reset and start the clock */
@@ -107,105 +126,6 @@ void timer_stop() {
 }
 
 
-/* SPI functions to read and write from the Si4432 radio chip using
- * the MSP430 hardware SPI, USCI B0.  The hardware is set up to use
- * SMCLK running at 1 MHz, divided by 60 to give the SPI clock a 60
- * usec period.  An 8-bit register address is sent first, followed
- * immediately by either an 8-bit read or write.  The Si4430/31/32
- * data sheet has all the gory details. */
-
-/* Enable SPI to talk to the radio */
-void enable_spi() {
-  UCB0CTL1 = UCSWRST;           /* shut down USCI */
-  
-  /* set up SPI clock */
-  UCB0CTL1 |= UCSSEL_2;         /* use SMCLK */
-  UCB0BR1 = 0;                  /* divide SMCLK by 60 */
-  UCB0BR0 = 60;
-  
-  /* running in 3-pin SPI because Si4432 wants 16-bit words */
-  UCB0CTL0 = (           
-    UCCKPH   |                  /* rising edge captures data */
-    UCMSB    |                  /* MSB first */
-    UCMODE_0 |                  /* 3-pin SPI */
-    UCMST    |                  /* use the USCI clock */
-    UCSYNC   );                 /* synchronous mode */
-  
-  /* set up SPI pins */
-  P2OUT |= NSEL_PIN;            /* make sure nSEL is high to start */
-  P2DIR |= NSEL_PIN;
-  P1SEL  |= ( SCK_PIN | SDO_PIN | SDI_PIN );
-  P1SEL2 |= ( SCK_PIN | SDO_PIN | SDI_PIN );
-
-  /* ready to go */
-  UCB0CTL1 &= ~UCSWRST;
-}
-
-/* Write a new value into a register on the radio.  If only one
- * register of the radio is written, a 16-bit value must be sent to
- * the radio (the 8-bit address of the register followed by the new
- * 8-bit value of the register).  To write a register, the MSB of the
- * address is set to 1 to indicate a device write. 
-*/
-void spi_write_register(uint8_t reg, uint8_t data) {
-  volatile uint8_t value;       /* stop compiler from optimizing */
-  
-  SR_ALLOC();
-  ENTER_CRITICAL();             /* disable interrupts */
-  P2OUT &= ~NSEL_PIN;           /* select Si4432 device */
-
-  while(!(IFG2 & UCB0TXIFG));   /* wait for last transmission done */
-  UCB0TXBUF = (reg | 0x80);     /* send register address */
-  while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
-  value = UCB0RXBUF;            /* read receive buffer */
-  UCB0TXBUF = data;             /* send data to register */
-  while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
-  value = UCB0RXBUF;            /* read receive buffer */
-
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
-  P2OUT |= NSEL_PIN;            /* release Si4432 device */
-  EXIT_CRITICAL();              /* restore status register */
-}
-
-
-/* Read one register from the radio.  When reading a single register
- * of the radio, a 16 bit value must be sent to the radio (the 8-bit
- * address of the register followed by a dummy 8-bit value).  The
- * radio provides the value of the register during the second byte of
- * the SPI transaction.  Note that it is crucial to clear the MSB of
- * the register address to indicate a read cycle.
- */
-uint8_t spi_read_register(uint8_t reg) {
-  volatile uint8_t value;
-
-  SR_ALLOC();
-  ENTER_CRITICAL();             /* disable interrupts */
-  P2OUT &= ~NSEL_PIN;           /* select Si4432 device */
-
-  while(!(IFG2 & UCB0TXIFG));   /* wait for last transmission */
-  UCB0TXBUF = (reg & 0x7F);     /* send register address */
-  while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
-  value = UCB0RXBUF;            /* read receive buffer */
-  UCB0TXBUF = 0;                /* send dummy value */
-  while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
-  value = UCB0RXBUF;            /* read data from receive buffer */
-
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
-  P2OUT |= NSEL_PIN;            /* release Si4432 device */
-  EXIT_CRITICAL();              /* restore status register */
-
-  return value;
-}
-
-/* Read a range of registers in the Si4432 */
-uint8_t* spi_burst_read(uint8_t addr, uint8_t len) {
-  return NULL;
-} /* unimplemented */
-
-/* Write a range of registers in the Si4432 */
-void spi_burst_write(uint8_t addr, uint8_t *data, uint8_t len) {
-} /* unimplemented */
-
 
 int main(int argc, char *argv[])
 {
@@ -217,8 +137,7 @@ int main(int argc, char *argv[])
   si4432_check_device();
   si4432_configure_gpio();
   si4432_set_frequency();
-  si4432_init_rx_modem();
-  si4432_init_tx_modem();
+  si4432_packet_config();
 
   enable_nirq();
   enable_clock_irq();
@@ -226,9 +145,14 @@ int main(int argc, char *argv[])
   __nop();
   __enable_interrupt();
 
-  xmit_start();
-  __delay_cycles(40000);
-  xmit_stop();
+  si4432_load_packet("hi there again", 14);
+  xmit_packet_start();
+  __delay_cycles(800000);
+  xmit_packet_stop();
+
+  xmit_tone_start();
+  __delay_cycles(4000000);      /* half-second */
+  xmit_tone_stop();
   
   while (1) {
     LPM3;                       /* sleep */

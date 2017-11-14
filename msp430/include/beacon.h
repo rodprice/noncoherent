@@ -109,20 +109,5 @@ void timer_start();
 /* Stop the timer and pause the clock */
 void timer_stop();
 
-/* Enable SPI to talk to the radio */
-void enable_spi();
-
-/* Read a register from the Si4432 */
-uint8_t spi_read_register(uint8_t addr);
-
-/* Read a range of registers in the Si4432 */
-uint8_t* spi_burst_read(uint8_t addr, uint8_t len);
-
-/* Write to a register in the Si4432 */
-void spi_write_register(uint8_t addr, uint8_t data);
-
-/* Write a range of registers in the Si4432 */
-void spi_burst_write(uint8_t addr, uint8_t *data, uint8_t len);
-
 
 #endif

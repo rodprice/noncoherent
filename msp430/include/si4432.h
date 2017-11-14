@@ -254,9 +254,37 @@
 
 /* packet stuff */
 #define Si4432_DATA_ACCESS_CONTROL                 0x30
+#define enpacrx  BIT7           /* enable packet rx handling */
+#define lsbfrst  BIT6           /* LSB first enable */
+#define crcdonly BIT5           /* CRC data only enable */
+#define skip2ph  BIT4           /* skip second phase of preamble detection */
+#define enpactx  BIT3           /* enable packet tx handling */
+#define encrc    BIT2           /* CRC enable */
+#define crc_ccitt    0          /* CRC polynomial */
+#define crc_ibm_16   1          /* CRC polynomial */
+#define crc_iec_16   2          /* CRC polynomial */
+#define crc_biacheva 3          /* CRC polynomial */
+
 #define Si4432_EZMAC_STATUS                        0x31
+#define rxcrc1   BIT6           /* last CRC received was all ones */
+#define pksrch   BIT5           /* packet searching */
+#define pkrx     BIT4           /* packet receiving */
+#define pkvalid  BIT3           /* valid packet received */
+#define crcerror BIT2           /* CRC error */
+#define pktx     BIT1           /* packet transmitting */
+#define pksent   BIT0           /* packet sent */
+
 #define Si4432_HEADER_CONTROL1                     0x32
+#define bcen_mask 0xF0          /* broadcast address check enable */
+#define hdch_mask 0x0F          /* received header bytes to be checked */
+
 #define Si4432_HEADER_CONTROL2                     0x33
+#define skipsyn        BIT7     /* skip sync word search timeout */
+#define hdlen_mask   ( BIT6 | BIT5 | BIT4 ) /* header length */
+#define fixpklen       BIT3     /* fix transmit/receive packet length */
+#define synclen_mask ( BIT2 | BIT1 ) /* sync word length */
+#define prealen        BIT0     /* MSB of preamble length */
+
 #define Si4432_PREAMBLE_LENGTH                     0x34
 #define Si4432_PREAMBLE_DETECTION_CONTROL1         0x35
 #define Si4432_SYNC_WORD3                          0x36
@@ -360,9 +388,9 @@
 #define tx_data_clock_nirq 0xC0 /* tx data clock into nIRQ pin */
 #define dtmod_mask (BIT5|BIT4)  /* modulation data source */
 #define dtmod_direct_gpio  0x00 /* tx data into GPIO pin */
-#define dtmod_direct_sdi   0x08 /* tx data into SDI pin */
-#define dtmod_direct_fifo  0x10 /* FIFO mode */
-#define dtmod_direct_pn9   0x18 /* PN9 m-sequence (x^9 + x^4 + 1) */
+#define dtmod_direct_sdi   0x10 /* tx data into SDI pin */
+#define dtmod_fifo         0x20 /* FIFO mode */
+#define dtmod_pn9          0x30 /* PN9 m-sequence (x^9 + x^4 + 1) */
 #define eninv BIT3              /* invert tx and rx data */
 #define freq_deviation_msb BIT2 /* MSB of frequency deviation */
 #define modtyp_mask (BIT1|BIT0) /* modulation type */
@@ -415,8 +443,10 @@ typedef enum {
   SENSOR,
   READY,
   TUNE,
-  XMIT,
-  RECV
+  XMIT_TONE,
+  XMIT_PACKET,
+  RECV_TONE,
+  RECV_PACKET
 } radiostate;
 
 
@@ -424,8 +454,11 @@ void si4432_reset();
 void si4432_check_device();
 void si4432_configure_gpio();
 void si4432_set_frequency();
-void si4432_init_rx_modem();
-void si4432_init_tx_modem();
+void si4432_init_tx_tone();
+void si4432_init_tx_packet();
+void si4432_init_rx_packet();
+void si4432_packet_config();
+void si4432_load_packet(uint8_t *data, uint8_t len);
 void si4432_set_state(radiostate state);  
 
 #endif

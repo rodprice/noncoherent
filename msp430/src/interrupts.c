@@ -15,7 +15,7 @@ volatile uint32_t clock;   /* real-time clock */
 volatile uint16_t galois;  /* m-sequence shift register */
 volatile uint16_t mticker; /* counts periods of m-sequences */
 volatile uint8_t  aticker; /* counts audio tone half-periods */
-
+volatile uint8_t  mode;    /* xmit/recv + tone/packet */
 
 /* M-sequence generation */
 __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
@@ -59,7 +59,13 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
     /* reading both status registers releases nIRQ */
     iflags1 = spi_read_register(Si4432_INTERRUPT_STATUS1);
     iflags2 = spi_read_register(Si4432_INTERRUPT_STATUS2);
+    /* first interrupt flag found wins */
     if (iflags2 & ipor) {       /* Si4432 power-on reset complete */
+      LPM3_EXIT;                /* wake up processor on exit */
+      return;
+    }
+    if (iflags1 & ipksent) {    /* packet transmission complete */
+      xmit_packet_stop();       /* turn off transmitter */
       LPM3_EXIT;                /* wake up processor on exit */
       return;
     }
