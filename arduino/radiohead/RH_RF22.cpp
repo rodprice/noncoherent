@@ -65,6 +65,13 @@ RH_RF22::RH_RF22(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi
     _polynomial = CRC_16_IBM; // Historical
 }
 
+bool RH_RF22::myinit()
+{
+    if (!RHSPIDriver::init())
+	return false;
+    return true;
+}
+
 bool RH_RF22::init()
 {
     if (!RHSPIDriver::init())
@@ -380,6 +387,8 @@ bool RH_RF22::setFrequency(float centre, float afcPullInRange)
     uint8_t fb = (uint8_t)integerPart - 24; // Range 0 to 23
     fbsel |= fb;
     uint16_t fc = fractionalPart * 64000;
+    // Serial.print("fbsel = 0x"); Serial.println(fbsel, HEX);
+    // Serial.print("fc = 0x"); Serial.println(fc, HEX);
     spiWrite(RH_RF22_REG_73_FREQUENCY_OFFSET1, 0);  // REVISIT
     spiWrite(RH_RF22_REG_74_FREQUENCY_OFFSET2, 0);
     spiWrite(RH_RF22_REG_75_FREQUENCY_BAND_SELECT, fbsel);

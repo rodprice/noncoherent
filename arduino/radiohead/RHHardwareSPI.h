@@ -25,13 +25,14 @@
 class RHHardwareSPI : public RHGenericSPI
 {
 public:
-    /// Constructor
-    /// Creates an instance of a hardware SPI interface, using whatever SPI hardware is available on
-    /// your processor platform. On Arduino and Uno32, uses SPI. On Maple, uses HardwareSPI.
-    /// \param[in] frequency One of RHGenericSPI::Frequency to select the SPI bus frequency. The frequency
-    /// is mapped to the closest available bus frequency on the platform.
-    /// \param[in] bitOrder Select the SPI bus bit order, one of RHGenericSPI::BitOrderMSBFirst or 
-    /// RHGenericSPI::BitOrderLSBFirst.
+    /// Constructor Creates an instance of a hardware SPI interface, using
+    /// whatever SPI hardware is available on your processor platform. On
+    /// Arduino and Uno32, uses SPI. On Maple, uses HardwareSPI.
+    /// \param[in] frequency One of RHGenericSPI::Frequency to select the SPI
+    /// bus frequency. The frequency is mapped to the closest available bus
+    /// frequency on the platform.
+    /// \param[in] bitOrder Select the SPI bus bit order, one of
+    /// RHGenericSPI::BitOrderMSBFirst or RHGenericSPI::BitOrderLSBFirst.
     /// \param[in] dataMode Selects the SPI bus data mode. One of RHGenericSPI::DataMode
     RHHardwareSPI(Frequency frequency = Frequency1MHz, BitOrder bitOrder = BitOrderMSBFirst, DataMode dataMode = DataMode0);
 

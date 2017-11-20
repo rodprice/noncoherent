@@ -1,6 +1,10 @@
 # Arduino Make file. Refer to https://github.com/sudar/Arduino-Makefile
 
 
+# --- specific to this project
+USER_LIB_PATH := $(CURDIR)
+ARDUINO_LIBS = SPI Si4432 radiohead
+
 # --- assumes src and include directories exist
 SRC := src
 LOCAL_C_SRCS    := $(wildcard $(SRC)/*.c)
@@ -14,16 +18,9 @@ INC := $(realpath include)
 CFLAGS   := -I$(INC)
 CXXFLAGS := -I$(INC)
 
-# --- specific to this project
-LIB := radiohead
-LOCAL_C_SRCS    += $(wildcard $(LIB)/*.c)
-LOCAL_CPP_SRCS  += $(wildcard $(LIB)/*.cpp)
-ARDUINO_LIBS = SPI SoftwareSerial
-
 # --- pro mini
 BOARD_TAG     = pro
 BOARD_SUB     = 8MHzatmega328
-# MONITOR_PORT  = $(firstword $(wildcard /dev/arduino-?))
 MONITOR_PORT  = /dev/arduino-?
 
 # --- arduino system paths
@@ -32,8 +29,8 @@ ARDUINO_DIR   = /usr/share/arduino
 AVR_TOOLS_DIR = /usr
 AVRDUDE_CONF  = /etc/avrdude.conf
 ARDUINO_QUIET = 1
-CFLAGS   += -Wno-deprecated-declarations
-CXXFLAGS += -Wno-deprecated-declarations
+CFLAGS   += -Wno-deprecated-declarations -Wno-unused-but-set-variable
+CXXFLAGS += -Wno-deprecated-declarations -Wno-unused-but-set-variable -Wno-write-strings
 
 include $(ARDMK_DIR)/Arduino.mk
 

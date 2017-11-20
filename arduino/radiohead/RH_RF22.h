@@ -940,6 +940,7 @@ public:
     /// - Sets the modem data rate to FSK_Rb2_4Fd36
     /// \return  true if everything was successful
     bool        init();
+    bool myinit();
 
     /// Issues a software reset to the 
     /// RH_RF22 module. Blocks for 1ms to ensure the reset is complete.
