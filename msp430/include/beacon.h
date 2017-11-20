@@ -69,7 +69,7 @@
 
 /* Defines the time unit of the Morse code generator.  A Morse code
    rate of 5 wpm corresponds to a time unit of 240 ms.   */
-#define MORSE_TICKS 256          /* 6 ms */
+#define MORSE_TICKS 8192        /* 192 ms */
 
 #define MESSAGE "AD0YX sending m-sequence    "
 

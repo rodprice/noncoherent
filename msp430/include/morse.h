@@ -108,6 +108,8 @@ static const uint8_t morse[MORSE_LUT_SIZE] =
     0b01000111                  /* wait, or ampersand */
   };
 
+typedef enum { ON, OFF, DONE } key;
+
 /* Change an ASCII code into a Morse code */
 uint8_t ascii2morse(char ascii);
 
@@ -118,7 +120,7 @@ uint8_t donemsg();
 void inittock();
 
 /* Generate Morse code sequence */
-uint8_t tock();
+key tock();
 
 /* Start sending Morse code */
 void morse_start();

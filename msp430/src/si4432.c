@@ -82,7 +82,7 @@ void si4432_init_tx_tone() {
   spi_write_register( Si4432_MODULATION_CONTROL2, \
                       tx_data_clock_gpio    |     \
                       dtmod_direct_gpio     |     \
-                      modtype_gfsk );
+                      modtyp_gfsk );
 
   /** Frequency deviation: 5000 Hz, BW = 18192 Hz by Carson's rule */
   spi_write_register( Si4432_FREQUENCY_DEVIATION, 8); 
@@ -104,7 +104,7 @@ void si4432_init_tx_packet() {
   spi_write_register( Si4432_MODULATION_CONTROL2,
                       tx_data_clock_none    | /* data clock not available */
                       dtmod_fifo            | /* FIFO mode */
-                      modtype_gfsk );         /* GFSK modulation */
+                      modtyp_gfsk );          /* GFSK modulation */
 
   /** Frequency deviation: 5000 Hz, BW = 14 kHz by Carson's rule */
   spi_write_register( Si4432_FREQUENCY_DEVIATION, 8); 
@@ -190,7 +190,7 @@ void si4432_set_state(radiostate state) {
     spi_write_register(Si4432_OPERATING_MODE1, xton);
     spi_write_register(Si4432_OPERATING_MODE2, 0x00);
     break;
-  case XMIT_TONE:
+  case XMIT_DIRECT:
     si4432_init_tx_tone();
     spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
     P1OUT |= RXON_PIN;          /* turn off receiver */
@@ -208,7 +208,7 @@ void si4432_set_state(radiostate state) {
     spi_write_register(Si4432_OPERATING_MODE1, txon | xton);
     LPM3;                       /* sleep until done */
     break;
-  case RECV_TONE:
+  case RECV_DIRECT:
     /* unimplemented, probably won't */
     si4432_set_state(READY);
     break;

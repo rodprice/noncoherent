@@ -397,7 +397,7 @@
 #define modtyp_unmodulated 0    /* unmodulated carrier */
 #define modtyp_ook         1    /* on-off keyed */
 #define modtyp_fsk         2    /* frequency-shift keyed */
-#define modtype_gfsk       3    /* gaussian fsk */
+#define modtyp_gfsk        3    /* gaussian fsk */
 
 /* frequency deviation */
 #define Si4432_FREQUENCY_DEVIATION                 0x72
@@ -443,9 +443,9 @@ typedef enum {
   SENSOR,
   READY,
   TUNE,
-  XMIT_TONE,
+  XMIT_DIRECT,
   XMIT_PACKET,
-  RECV_TONE,
+  RECV_DIRECT,
   RECV_PACKET
 } radiostate;
 

@@ -6,25 +6,27 @@
 #include "spi.h"
 #include "si4432.h"
 #include "util.h"
+#include "morse.h"
 
 
 extern volatile uint32_t clock;  /* increments every two seconds */
 extern volatile uint8_t aticker; /* counts audio tone half-periods */
+extern volatile key lastkey;     /* lagging Morse key state */
 
 
 /* Read calibration data from TLV, verify checksum */
 /* http://www.simplyembedded.org/tutorials/msp430-configuration/ */
 static int _verify_cal_data(void)
 {
-    uint8_t len = 31;
-    uint16_t *data = (uint16_t *) 0x10c2;
-    uint16_t crc = 0;
- 
-    while (len-- > 0) {
-        crc ^= *(data++);
-    }
- 
-    return (TLV_CHECKSUM + crc);
+  uint8_t len = 31;
+  uint16_t *data = (uint16_t *) 0x10c2;
+  uint16_t crc = 0;
+  
+  while (len-- > 0) {
+    crc ^= *(data++);
+  }
+  
+  return (TLV_CHECKSUM + crc);
 }
 
 
@@ -89,13 +91,26 @@ void xmit_tone_start() {
   aticker = AUDIO_TICKS;        /* start the audio clock */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
   P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */
-  si4432_set_state(XMIT_TONE);  /* start transmitting */
+  si4432_set_state(XMIT_DIRECT); /* start transmitting */
 }
 
 void xmit_tone_stop() {
   si4432_set_state(READY);      /* stop transmitting */
   P2IE  &= ~XMIT_CLOCK_PIN;     /* disable interrupt on pin */  
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
+}
+
+/* Starts sending Morse code, assuming that the timer is running */
+void xmit_morse_start() {
+  inittock();                   /* point tock() at first letter */
+  lastkey = OFF;                /* tell ISR that transmitter is off */
+  TACCR1 = MORSE_TICKS;         /* set time until next interrupt */
+  TACCTL1 = CCIE;               /* compare mode, interrupt enabled */
+}
+
+/* Stop sending Morse code, but don't stop the timer */
+void xmit_morse_stop() {
+  TACCTL1 = 0;                  /* stop morse_isr() interrupts */
 }
 
 void xmit_packet_start() {
@@ -115,14 +130,15 @@ void timer_start() {
   TACCR0 = 0;                   /* stop the timer */
   TACTL |= TACLR;               /* set timer count to 0 */
   clock = 0;                    /* reset the clock */
-  /* do something with TAIE to enable interrupts */
-  TACTL = TASSEL0 | ID0 | MC_2 | TACLR; /* timer source ACLK, continuous mode */
+  /* timer source ACLK, continuous mode */
+  TACTL = TASSEL0 | ID0 | MC_2; 
 }
 
 /* Stop the timer and pause the clock */
 void timer_stop() {
   TACCR0 = 0;                    /* stop the timer */
   TACTL |= TACLR;                /* set TAR to 0 */
+  TACTL &= ~MC_0;                /* set halted mode */
 }
 
 
@@ -153,6 +169,12 @@ int main(int argc, char *argv[])
   xmit_tone_start();
   __delay_cycles(4000000);      /* half-second */
   xmit_tone_stop();
+
+  /* timer_start(); */
+  /* xmit_morse_start(); */
+  /* __delay_cycles(16000000);     /\* two seconds *\/ */
+  /* xmit_morse_stop(); */
+  /* timer_stop(); */
   
   while (1) {
     LPM3;                       /* sleep */

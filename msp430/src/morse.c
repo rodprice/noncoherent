@@ -16,8 +16,10 @@
 #include "beacon.h"
 
 
+extern volatile key lastkey;    /* lagging Morse key state */
+
 /* Change these should you ever wish to use 16-bit registers */
-typedef uint8_t BIT;
+typedef uint8_t bool;           /* not the C99 bool type */
 typedef uint8_t REGISTER;
 
 #define ONES 0xFF
@@ -67,23 +69,23 @@ static const char message[sizeof(MESSAGE)] = MESSAGE;
 
 
 /* Internal state */
-static REGISTER mcode;   /* the current Morse code being sent */
-static REGISTER mchar;   /* the character being sent */
+static REGISTER mcode;   /* the current Morse letter being sent */
+static REGISTER mchar;   /* the character (symbol) being sent */
 static uint8_t code_ptr; /* points to current letter in message */
 
 
 /* All the bits in the character have been sent */
-inline BIT donechar() {
+inline bool donechar() {
   return mchar == ZEROS || mchar == ONES;
 }
 
 /* All the characters in the code have been sent */
-inline BIT donecode() {
+inline bool donecode() {
   return mcode == ZEROS || mcode == ONES;
 }
 
 /* The entire message has been sent */
-BIT donemsg() {
+bool donemsg() {
   return code_ptr >= sizeof(MESSAGE);
 }
 
@@ -110,7 +112,7 @@ void nextcode() {
 }
 
 /* Send a new bit and queue up the next one */
-inline BIT nextchar() {
+inline bool nextchar() {
   mchar <<= 1;       /* queue up the next bit */
   mchar |= BIT0;
   return (mchar & BIT7) ? 1 : 0 ;
@@ -124,11 +126,11 @@ inline void inittock() {
 }
 
 /* Sends a new bit at every call until message is sent */
-BIT tock() {
+key tock() {
   if (donechar()) {
     if (donecode()) {
       if (donemsg()) { 
-        return 0;
+        return DONE;
       } else {
         mcode = ascii2morse(message[code_ptr++]);
         if (mcode == ONES) {
@@ -141,16 +143,5 @@ BIT tock() {
       nextcode();
     }
   }
-  return nextchar();
-}
-
-/* Start sending Morse code */
-inline void morse_start() {
-  TACCR1 = MORSE_TICKS;          /* Morse code clock rate */
-  TACCTL1 = CCIE;                /* compare mode, interrupt enabled */
-}
-
-/* Stop sending Morse code */
-inline void morse_stop() {
-  TACCTL1 = 0;                   /* stop morse_isr() interrupts */
+  return nextchar() ? ON : OFF ;
 }
