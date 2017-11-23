@@ -102,8 +102,7 @@ void xmit_tone_stop() {
 
 /* Starts sending Morse code, assuming that the timer is running */
 void xmit_morse_start() {
-  inittock();                   /* point tock() at first letter */
-  lastkey = OFF;                /* tell ISR that transmitter is off */
+  lastkey = init_tock();        /* point tock() at first letter */
   TACCR1 = MORSE_TICKS;         /* set time until next interrupt */
   TACCTL1 = CCIE;               /* compare mode, interrupt enabled */
 }
@@ -161,20 +160,23 @@ int main(int argc, char *argv[])
   __nop();
   __enable_interrupt();
 
-  si4432_load_packet("hi there again", 14);
-  xmit_packet_start();
-  __delay_cycles(800000);
-  xmit_packet_stop();
+  /* si4432_load_packet("hi there again", 14); */
+  /* xmit_packet_start(); */
+  /* __delay_cycles(800000); */
+  /* xmit_packet_stop(); */
 
-  xmit_tone_start();
-  __delay_cycles(4000000);      /* half-second */
-  xmit_tone_stop();
+  /* xmit_tone_start(); */
+  /* __delay_cycles(4000000);      /\* half-second *\/ */
+  /* xmit_tone_stop(); */
 
-  /* timer_start(); */
-  /* xmit_morse_start(); */
-  /* __delay_cycles(16000000);     /\* two seconds *\/ */
-  /* xmit_morse_stop(); */
-  /* timer_stop(); */
+  timer_start();
+  __delay_cycles(1000);
+  xmit_morse_start();
+  si4432_get_state();
+  __delay_cycles(16000000);     /* two seconds */
+  xmit_morse_stop();
+  timer_stop();
+  si4432_set_state(READY);
   
   while (1) {
     LPM3;                       /* sleep */

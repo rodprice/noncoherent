@@ -45,6 +45,12 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
     case TA0IV_TACCR1:          /* Morse interrupt pending */
       TACCR1 += MORSE_TICKS;    /* set the next timer period */
       thiskey = tock();         /* get next key of Morse code */
+      /* /\* thiskey = (lastkey == ON) ? OFF : ON ; *\/ */
+      /* if (thiskey == ON) { */
+      /*   P1OUT &= ~TXON_PIN;         /\* turn on transmitter *\/ */
+      /* } else { */
+      /*   P1OUT |= TXON_PIN;         /\* turn off transmitter *\/ */
+      /* } */
       if (thiskey != lastkey) { /* Morse key state changed */
         switch (thiskey) {
         case OFF:               /* turn transmitter off */
@@ -53,9 +59,9 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
         case ON:                /* turn transmitter on */
           si4432_set_state(XMIT_DIRECT);
           break;
-        case DONE:              /* finished with transmission */
+        case DOWN:              /* finished with transmission */
+          si4432_set_state(READY);
           TACCTL1 = 0;          /* stop morse_isr() interrupts */
-          LPM3_EXIT;            /* wake up processor if needed */
           break;
         }
       }

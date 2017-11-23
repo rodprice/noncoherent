@@ -1,6 +1,6 @@
 /**
  * morse.c, generation of Morse code from ASCII strings
- * Rodney Price, Sept 2017
+ * Rodney Price, Sept 2017, Nov 2017
  *
  * This implementation tries to be as parsimonious as possible
  * with the stack and other variables, at the possible expense
@@ -10,29 +10,30 @@
 
 
 #include <msp430.h>
-#include <stdint.h>
-
 #include "morse.h"
 #include "beacon.h"
 
 
+/* What to say */
+static const char message[] = "AD0YX send";
 extern volatile key lastkey;    /* lagging Morse key state */
 
-/* Change these should you ever wish to use 16-bit registers */
-typedef uint8_t bool;           /* not the C99 bool type */
-typedef uint8_t REGISTER;
+#define SPACE_CODE 0x00
+#define DOT        0b10111111   /* 0xBF or 191 */
+#define DELAY_DOT  0b00101111   /* 0x2F or  47 */
+#define DASH       0b11101111   /* 0xEF or 239 */
+#define DELAY_DASH 0b00111011   /* 0x3B or  59 */
+#define SPACE      0b00001111   /* 0x0F or  15 */
 
-#define ONES 0xFF
-#define ZEROS 0x00
-#define DOT  0b10111111
-#define DASH 0b11101111
-#define SPACEDOT  0b00101111
-#define SPACEDASH 0b00111011
-#define SPACEWORD 0b00001111
+#define bool uint8_t            /* not the C99 bool type! */
+#define shifter uint8_t         /* shift register */
+
+/* Left shift that preserves the LSB */
+#define SHIFT(byte) ((byte << 1) + (byte & 0x01))
 
 
 /* Access to the ASCII -> Morse lookup table */
-REGISTER ascii2morse(char ascii) {
+shifter ascii2morse(char ascii) {
   if (48 <= ascii && ascii < 58) {
     return morse[ascii-48];     /* ASCII numerals start at 48 */
   } else if (65 <= ascii && ascii < 91) {
@@ -60,88 +61,88 @@ REGISTER ascii2morse(char ascii) {
     case '$': return morse[52];
     case '@': return morse[53];
     }
-    return ONES;  /* the rest aren't ASCII characters */
+    return SPACE_CODE;          /* anything else acts like a space */
   }
 }
-
-
-static const char message[sizeof(MESSAGE)] = MESSAGE;
 
 
 /* Internal state */
-static REGISTER mcode;   /* the current Morse letter being sent */
-static REGISTER mchar;   /* the character (symbol) being sent */
-static uint8_t code_ptr; /* points to current letter in message */
+static shifter symbols;         /* the current Morse letter being sent */
+static shifter keys;            /* the current symbol being sent */
+static uint8_t letter;          /* points to current letter in message */
 
 
-/* All the bits in the character have been sent */
-inline bool donechar() {
-  return mchar == ZEROS || mchar == ONES;
+/* Get the current key (MSB) and queue up the next one */
+key next_key() {
+  key out;
+  out = (keys & 0x80) ? ON : OFF ;
+  keys = SHIFT(keys);
+  return out;
 }
 
-/* All the characters in the code have been sent */
-inline bool donecode() {
-  return mcode == ZEROS || mcode == ONES;
+/* Have we sent the entire symbol (all the keys)? */
+bool done_symbol() {
+  return keys == 0xFF;
 }
 
-/* The entire message has been sent */
-bool donemsg() {
-  return code_ptr >= sizeof(MESSAGE);
+/* Get the next symbol, including a one-unit space between the last */
+shifter next_short_symbol() {
+  bool out;
+  out = (symbols & 0x80) ? DASH : DOT ;
+  symbols = SHIFT(symbols);
+  return out;
 }
 
-/* Start sending a new character and queue up the next one */
-void nextspacecode() {
-  if (mcode & BIT7)  /* three-unit space between letters */
-    mchar = SPACEDASH;
-  else
-    mchar = SPACEDOT;
-  mcode <<= 1;       /* queue up the next character */
-  if (mcode & BIT1)
-    mcode |= BIT0;
+/* Get the next symbol, including a three-unit space between the last */
+shifter next_long_symbol() {
+  bool out;
+  out = (symbols & 0x80) ? DELAY_DASH : DELAY_DOT ;
+  symbols = SHIFT(symbols);
+  return out;
 }
 
-/* Start sending a new character and queue up the next one */
-void nextcode() {
-  if (mcode & BIT7)  /* one-unit space between characters */
-    mchar = DASH;
-  else
-    mchar = DOT;
-  mcode <<= 1;       /* queue up the next character */
-  if (mcode & BIT1)
-    mcode |= BIT0;
+/* Have we sent the entire letter (all the symbols)? */
+bool done_letter() {
+  return (symbols == 0x00) || (symbols == 0xFF);
 }
 
-/* Send a new bit and queue up the next one */
-inline bool nextchar() {
-  mchar <<= 1;       /* queue up the next bit */
-  mchar |= BIT0;
-  return (mchar & BIT7) ? 1 : 0 ;
+/* Get the next letter in the message */
+char next_letter() {
+  return ascii2morse(message[letter++]);
 }
 
-/* Initialize the Morse code generator */
-inline void inittock() {
-  mchar = ONES;
-  mcode = ONES;
-  code_ptr = 0;
+/* Have we sent all the letters (excluding the NULL at the end)? */
+bool done_message() {
+  return (letter >= sizeof(message) || message[letter] == 0);
 }
 
-/* Sends a new bit at every call until message is sent */
+/* Load up the first symbol and key, but don't send yet */
+key init_tock() {
+  letter = 0;
+  symbols = next_letter();
+  keys = next_short_symbol();
+  return DOWN;
+}
+
+/* One tick of the Morse code state machine, a new key every tick */
 key tock() {
-  if (donechar()) {
-    if (donecode()) {
-      if (donemsg()) { 
-        return DONE;
-      } else {
-        mcode = ascii2morse(message[code_ptr++]);
-        if (mcode == ONES) {
-          mchar = SPACEWORD;
-        } else {
-          nextspacecode();
-        }
-      }
-    } else {
-      nextcode();
-    }
+  if ( !done_symbol() ) {
+    return next_key();
   }
-  return nextchar() ? ON : OFF ;
+  if ( !done_letter() ) {
+    keys = next_short_symbol();
+    return next_key();
+  }
+  if ( !done_message() ) {
+    symbols = next_letter();
+    if (symbols == SPACE_CODE) {
+      symbols = 0xFF;
+      keys = SPACE;
+    } else {
+      keys = next_long_symbol();
+    }
+    return next_key();
+  } else {
+    return DOWN;
+  }
 }

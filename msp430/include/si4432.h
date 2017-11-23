@@ -460,5 +460,6 @@ void si4432_init_rx_packet();
 void si4432_packet_config();
 void si4432_load_packet(uint8_t *data, uint8_t len);
 void si4432_set_state(radiostate state);  
+radiostate si4432_get_state();
 
 #endif

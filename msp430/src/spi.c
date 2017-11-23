@@ -20,8 +20,8 @@ void enable_spi() {
   
   /* set up SPI clock */
   UCB0CTL1 |= UCSSEL_2;         /* use SMCLK */
-  UCB0BR1 = 0;                  /* divide SMCLK by 60 */
-  UCB0BR0 = 60;
+  UCB0BR1 = 0;                  /* don't divide SMCLK */
+  UCB0BR0 = 1;
   
   /* running in 3-pin SPI because Si4432 wants 16-bit words */
   UCB0CTL0 = (           

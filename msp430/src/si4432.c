@@ -181,7 +181,33 @@ void si4432_load_packet(uint8_t *data, uint8_t len) {
   spi_read_register(Si4432_INTERRUPT_STATUS2);
 }
 
-/* Set Si4432 chip state, turn on/off transmitter and receiver */
+/* Query the radio for power state information */
+radiostate si4432_get_state() {
+  uint8_t status, mode;
+  mode = dtmod_mask & spi_read_register(Si4432_MODULATION_CONTROL2);
+  status = spi_read_register(Si4432_CRYSTAL_OSCILLATOR_POR_CONTROL);
+  switch (status & internal_power_state_mask) {
+  case internal_power_state_lp:
+    return IDLE;
+  case internal_power_state_ready:
+    return READY;
+  case internal_power_state_tune:
+    return TUNE;
+  case internal_power_state_tx:
+    if (mode == dtmod_direct_gpio || mode == dtmod_direct_sdi)
+      return XMIT_DIRECT;
+    else
+      return XMIT_PACKET;
+  case internal_power_state_rx:
+    if (mode == dtmod_direct_gpio || mode == dtmod_direct_sdi)
+      return RECV_DIRECT;
+    else
+      return RECV_PACKET;
+  }
+  return SHUTDOWN;
+}
+
+/* Set radio state, turn on/off transmitter and receiver */
 void si4432_set_state(radiostate state) {
   switch (state) {
   case READY:
