@@ -47,7 +47,7 @@ void si4432_configure_gpio() {
     input_tx_direct_modulation_data );
   spi_write_register(           /* GPIO2 is recv data output */
     Si4432_GPIO_CONFIGURATION2,
-    output_rx_data );
+    input_direct_digital );
 }
 
 /* Frequency control stuff */
@@ -68,7 +68,7 @@ void si4432_set_frequency() {
 }
 
 /* Transmitter setup */
-void si4432_init_tx_tone() {
+void si4432_init_tx_direct() {
   /** Transmit power: ?? dBm */
   spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
 
@@ -212,13 +212,17 @@ void si4432_set_state(radiostate state) {
   switch (state) {
   case READY:
     P1OUT |= RXON_PIN | TXON_PIN; /* turn off recv and xmit */
-    P1OUT &= ~XMIT_LED_PIN;       /* turn off transmit light */
     spi_write_register(Si4432_OPERATING_MODE1, xton);
+    spi_write_register(Si4432_OPERATING_MODE2, 0x00);
+    P1OUT &= ~XMIT_LED_PIN;     /* turn off transmit light */
+    break;
+  case TUNE:
+    P1OUT |= RXON_PIN | TXON_PIN; /* turn off recv and xmit */
+    P1OUT &= ~XMIT_LED_PIN;     /* turn off transmit light */
+    spi_write_register(Si4432_OPERATING_MODE1, pllon);
     spi_write_register(Si4432_OPERATING_MODE2, 0x00);
     break;
   case XMIT_DIRECT:
-    si4432_init_tx_tone();
-    spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
     P1OUT |= RXON_PIN;          /* turn off receiver */
     P1OUT &= ~TXON_PIN;         /* turn on transmitter */
     P1OUT |= XMIT_LED_PIN;      /* turn on transmit light */
@@ -227,12 +231,10 @@ void si4432_set_state(radiostate state) {
     break;
   case XMIT_PACKET:
     si4432_init_tx_packet();
-    spi_write_register( Si4432_TX_POWER, txpow_max | lna_sw );
     P1OUT |= RXON_PIN;          /* turn off receiver */
     P1OUT &= ~TXON_PIN;         /* turn on transmitter */
     P1OUT |= XMIT_LED_PIN;      /* turn on transmit light */
     spi_write_register(Si4432_OPERATING_MODE1, txon | xton);
-    LPM3;                       /* sleep until done */
     break;
   case RECV_DIRECT:
     /* unimplemented, probably won't */
@@ -245,7 +247,6 @@ void si4432_set_state(radiostate state) {
     P1OUT |= TXON_PIN;          /* turn off transmitter */
     P1OUT &= ~XMIT_LED_PIN;     /* turn off transmit light */
     spi_write_register(Si4432_OPERATING_MODE1, rxon | xton);
-    LPM3;                       /* sleep until done */
     break;
   }
 }

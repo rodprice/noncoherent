@@ -62,7 +62,6 @@ void spi_write_register(uint8_t reg, uint8_t data) {
   while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
   value = UCB0RXBUF;            /* read receive buffer */
 
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 }
@@ -88,7 +87,6 @@ void spi_burst_write(uint8_t addr, uint8_t *data, uint8_t len) {
     value = UCB0RXBUF;          /* clear receive buffer */
   }
 
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 }
@@ -116,7 +114,6 @@ uint8_t spi_read_register(uint8_t reg) {
   while(!(IFG2 & UCB0RXIFG));   /* wait for receive buffer full */
   value = UCB0RXBUF;            /* read data from receive buffer */
 
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 
@@ -142,7 +139,6 @@ uint8_t* spi_burst_read(uint8_t addr, uint8_t *data, uint8_t len) {
     data[i] = UCB0RXBUF;          /* read data from receive buffer */
   }
 
-  __delay_cycles(600);          /* keep nSEL low past end of SCLK */
   P2OUT |= NSEL_PIN;            /* release Si4432 device */
   EXIT_CRITICAL();              /* restore status register */
 

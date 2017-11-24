@@ -11,7 +11,7 @@
 
 extern volatile uint32_t clock;  /* increments every two seconds */
 extern volatile uint8_t aticker; /* counts audio tone half-periods */
-extern volatile key lastkey;     /* lagging Morse key state */
+extern volatile key beeping;     /* audio/transmitter state */
 
 
 /* Read calibration data from TLV, verify checksum */
@@ -34,8 +34,6 @@ static int _verify_cal_data(void)
 void configure_clocks() {
   WDTCTL = WDTPW + WDTHOLD;    /* hold the watchdog */
   DCOCTL = 0;                  /* set DCO clock to lowest setting */
-  /* BCSCTL1 = CALBC1_1MHZ;       /\* set MCLK to 1 MHz from cal data *\/ */
-  /* DCOCTL = CALDCO_1MHZ;        /\* set DCOCLK to 1 MHz from cal data *\/ */
   BCSCTL1 = CALBC1_8MHZ;       /* set MCLK to 8 MHz from cal data */
   DCOCTL = CALDCO_8MHZ;        /* set DCOCLK to 8 MHz from cal data */
   BCSCTL2 = DIVS_3;            /* set SMCLK to 1 MHZ (divide by 8) */
@@ -59,8 +57,9 @@ void configure_pins() {
     SCK_PIN       |            /* SPI SCLK pin set low */
     SDI_PIN       );           /* SPI SIMO pin set low */
   /* Port 2 pins */
-  P2OUT = NSEL_PIN;            /* nSEL high, SDN low */
-  P2DIR = NSEL_PIN | SDN_PIN;  /* all other pins are inputs */
+  P2REN = GPIO2_PIN;            /* set pullup resistor on button */
+  P2OUT = NSEL_PIN | GPIO2_PIN; /* nSEL high, SDN low */
+  P2DIR = NSEL_PIN | SDN_PIN;   /* all other pins are inputs */
 }
 
 /* Enable interrupts on the nIRQ pin */
@@ -80,7 +79,7 @@ void disable_nirq() {
 /* Enable interrupts from the radio for direct mode transmission */
 void enable_clock_irq() {
   P2DIR |= XMIT_DATA_PIN;       /* pin drives Si4432 tx data */
-  P2DIR &= ~RECV_DATA_PIN;      /* pin accepts Si4432 rx data */
+  /* P2DIR &= ~RECV_DATA_PIN;      /\* pin accepts Si4432 rx data *\/ */
   P2DIR &= ~XMIT_CLOCK_PIN;     /* pin accepts Si4423 tx clock */
   P2IES |= XMIT_CLOCK_PIN;      /* high-to-low requests interrupt */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
@@ -90,8 +89,10 @@ void enable_clock_irq() {
 void xmit_tone_start() {
   aticker = AUDIO_TICKS;        /* start the audio clock */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
-  P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */
+  P2IE  |= XMIT_CLOCK_PIN;      /* enable audio interrupt */
+  si4432_init_tx_direct();      /* start sending xmit clock */
   si4432_set_state(XMIT_DIRECT); /* start transmitting */
+  beeping = ON;
 }
 
 void xmit_tone_stop() {
@@ -102,13 +103,21 @@ void xmit_tone_stop() {
 
 /* Starts sending Morse code, assuming that the timer is running */
 void xmit_morse_start() {
-  lastkey = init_tock();        /* point tock() at first letter */
+  aticker = AUDIO_TICKS;        /* start the audio clock */
+  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
+  P2IE  |= XMIT_CLOCK_PIN;      /* enable audio interrupt */
+  si4432_init_tx_direct();      /* start sending xmit clock */
+  beeping = init_tock();        /* point tock() at first letter */
   TACCR1 = MORSE_TICKS;         /* set time until next interrupt */
-  TACCTL1 = CCIE;               /* compare mode, interrupt enabled */
+  TACCTL1 = CCIE;               /* enable Morse interrupts */
+  si4432_set_state(XMIT_DIRECT); /* start transmitting */
 }
 
 /* Stop sending Morse code, but don't stop the timer */
 void xmit_morse_stop() {
+  si4432_set_state(READY);      /* stop transmitting */
+  P2IE  &= ~XMIT_CLOCK_PIN;     /* disable interrupt on pin */  
+  P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
   TACCTL1 = 0;                  /* stop morse_isr() interrupts */
 }
 
@@ -170,15 +179,12 @@ int main(int argc, char *argv[])
   /* xmit_tone_stop(); */
 
   timer_start();
-  __delay_cycles(1000);
   xmit_morse_start();
-  si4432_get_state();
-  __delay_cycles(16000000);     /* two seconds */
+  __delay_cycles(160000000);     /* two seconds */
   xmit_morse_stop();
   timer_stop();
   si4432_set_state(READY);
   
-  while (1) {
-    LPM3;                       /* sleep */
-  }
+  while (1);
+  return 0;
 }

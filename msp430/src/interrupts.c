@@ -15,8 +15,7 @@ volatile uint32_t clock;        /* real-time clock */
 volatile uint16_t galois;       /* m-sequence shift register */
 volatile uint16_t mticker;      /* counts periods of m-sequences */
 volatile uint8_t  aticker;      /* counts audio tone half-periods */
-volatile uint8_t  mode;         /* xmit/recv + tone/packet */
-volatile key      lastkey;      /* lagging Morse key state */
+volatile key beeping;           /* audio/transmitter state */
 
 /* M-sequence generation */
 __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
@@ -36,36 +35,16 @@ __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
 
 /* Morse code generation and clock */
 __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
-  key thiskey;
   switch(__even_in_range(TAIV,TAIV_TAIFG))
     {
     case 0:                     /* no interrupt pending */
       return;
 
     case TA0IV_TACCR1:          /* Morse interrupt pending */
-      TACCR1 += MORSE_TICKS;    /* set the next timer period */
-      thiskey = tock();         /* get next key of Morse code */
-      /* /\* thiskey = (lastkey == ON) ? OFF : ON ; *\/ */
-      /* if (thiskey == ON) { */
-      /*   P1OUT &= ~TXON_PIN;         /\* turn on transmitter *\/ */
-      /* } else { */
-      /*   P1OUT |= TXON_PIN;         /\* turn off transmitter *\/ */
-      /* } */
-      if (thiskey != lastkey) { /* Morse key state changed */
-        switch (thiskey) {
-        case OFF:               /* turn transmitter off */
-          si4432_set_state(READY);
-          break;
-        case ON:                /* turn transmitter on */
-          si4432_set_state(XMIT_DIRECT);
-          break;
-        case DOWN:              /* finished with transmission */
-          si4432_set_state(READY);
-          TACCTL1 = 0;          /* stop morse_isr() interrupts */
-          break;
-        }
-      }
-      lastkey = thiskey;        /* remember the current key */
+      TACCR1 += MORSE_TICKS;    /* set up next interrupt */
+      beeping = tock();         /* get next key of Morse code */
+      if (beeping == DOWN)
+        xmit_morse_stop();
       return;
 
     case TA0IV_TAIFG:           /* timer overflow interrupt */
@@ -86,22 +65,22 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
     iflags2 = spi_read_register(Si4432_INTERRUPT_STATUS2);
     /* first interrupt flag found wins */
     if (iflags2 & ipor) {       /* Si4432 power-on reset complete */
-      LPM3_EXIT;                /* wake up processor on exit */
       return;
     }
     if (iflags1 & ipksent) {    /* packet transmission complete */
       xmit_packet_stop();       /* turn off transmitter */
-      LPM3_EXIT;                /* wake up processor on exit */
       return;
     }
   }
 
   /* Transmit clock interrupt handler */
-  if (P2IFG & XMIT_CLOCK_PIN) { /* just sends a single FM tone */
+  if (P2IFG & XMIT_CLOCK_PIN) { /* beeps, or not -- single FM tone */
     P2IFG &= ~XMIT_CLOCK_PIN;   /* clear the interrupt flag */
-    if (--aticker == 0) {       /* time to shift frequency? */
-      aticker = AUDIO_TICKS;    /* reset counter */
-      P2OUT ^= XMIT_DATA_PIN;   /* toggle transmit data output */
+    if (beeping == ON) {        /* determined elsewhere */
+      if (--aticker == 0) {     /* time to shift GFSK frequency? */
+        aticker = AUDIO_TICKS;  /* reset counter */
+        P2OUT ^= XMIT_DATA_PIN; /* toggle transmit data output */
+      }
     }
   }
 }
