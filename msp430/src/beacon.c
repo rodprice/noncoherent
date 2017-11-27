@@ -11,7 +11,7 @@
 
 extern volatile uint32_t clock;  /* increments every two seconds */
 extern volatile uint8_t aticker; /* counts audio tone half-periods */
-extern volatile key beeping;     /* audio/transmitter state */
+extern volatile key thiskey;     /* audio/transmitter state */
 
 
 /* Read calibration data from TLV, verify checksum */
@@ -32,34 +32,44 @@ static int _verify_cal_data(void)
 
 /* Set up MSP430 clocks, watchdog */
 void configure_clocks() {
-  WDTCTL = WDTPW + WDTHOLD;    /* hold the watchdog */
-  DCOCTL = 0;                  /* set DCO clock to lowest setting */
-  BCSCTL1 = CALBC1_8MHZ;       /* set MCLK to 8 MHz from cal data */
-  DCOCTL = CALDCO_8MHZ;        /* set DCOCLK to 8 MHz from cal data */
-  BCSCTL2 = DIVS_3;            /* set SMCLK to 1 MHZ (divide by 8) */
+  WDTCTL = WDTPW + WDTHOLD;     /* hold the watchdog */
+  DCOCTL = 0;                   /* set DCO clock to lowest setting */
+  BCSCTL1 = CALBC1_8MHZ;        /* set MCLK to 8 MHz from cal data */
+  DCOCTL = CALDCO_8MHZ;         /* set DCOCLK to 8 MHz from cal data */
+  BCSCTL2 = DIVS_3;             /* set SMCLK to 1 MHZ (divide by 8) */
   BCSCTL3 |= LFXT1S_0 | XCAP_3; /* ACLK from 32768 Hz crystal, 12.5 pF */
-  __delay_cycles(500000);      /* wait for 32768 Hz oscillator to start */
+  __delay_cycles(500000);       /* wait for 32768 Hz oscillator to start */
 }
 
 /* Set up MSP430 I/O pins */
 void configure_pins() {
   /* Port 1 pins */
-  P1REN = BUTTON_PIN;          /* set pullup resistor on button */
   P1OUT =         (
-    BUTTON_PIN    |            /* pull up, not down */
-    TXON_PIN      |            /* high turns transmitter off */
-    RXON_PIN      );           /* high turns receiver off */
-  P1DIR =         (            /* BUTTON_PIN and SDO_PIN are inputs */
-    XMIT_LED_PIN  |            /* transmit light off */
-    READY_LED_PIN |            /* power/ready light off */
-    TXON_PIN      |            /* transmit command off */
-    RXON_PIN      |            /* receive command off */
-    SCK_PIN       |            /* SPI SCLK pin set low */
-    SDI_PIN       );           /* SPI SIMO pin set low */
+    TXON_PIN      |             /* high turns transmitter off */
+    RXON_PIN      );            /* high turns receiver off */
+  P1DIR =         (
+    XMIT_LED_PIN  |             /* transmit light off */
+    TXON_PIN      |             /* transmit command off */
+    RXON_PIN      |             /* receive command off */
+    SCK_PIN       |             /* SPI SCLK pin set low */
+    SDI_PIN       );            /* SPI SIMO pin set low */
   /* Port 2 pins */
-  P2REN = GPIO2_PIN;            /* set pullup resistor on button */
-  P2OUT = NSEL_PIN | GPIO2_PIN; /* nSEL high, SDN low */
-  P2DIR = NSEL_PIN | SDN_PIN;   /* all other pins are inputs */
+  P2OUT =         (
+    NSEL_PIN      );            /* nSEL is active low */
+  P2DIR =         (
+    XMIT_DATA_PIN |
+    NSEL_PIN      |
+    READY_LED_PIN );
+  /* Set up SPI pins */
+  P1SEL  |= ( SCK_PIN | SDO_PIN | SDI_PIN );
+  P1SEL2 |= ( SCK_PIN | SDO_PIN | SDI_PIN );
+  /* Set up UART pins */
+  /* P1SEL  |= ( RXD_PIN | TXD_PIN ); */
+  /* P1SEL2 |= ( RXD_PIN | TXD_PIN ); */
+  P1OUT &= ~RXD_PIN;            /* debug */
+  P1OUT &= ~TXD_PIN;            /* debug */
+  P1DIR |= RXD_PIN;             /* debug */
+  P1DIR |= TXD_PIN;             /* debug */
 }
 
 /* Enable interrupts on the nIRQ pin */
@@ -78,9 +88,9 @@ void disable_nirq() {
 
 /* Enable interrupts from the radio for direct mode transmission */
 void enable_clock_irq() {
-  P2DIR |= XMIT_DATA_PIN;       /* pin drives Si4432 tx data */
+  /* P2DIR |= XMIT_DATA_PIN;       /\* pin drives Si4432 tx data *\/ */
   /* P2DIR &= ~RECV_DATA_PIN;      /\* pin accepts Si4432 rx data *\/ */
-  P2DIR &= ~XMIT_CLOCK_PIN;     /* pin accepts Si4423 tx clock */
+  /* P2DIR &= ~XMIT_CLOCK_PIN;     /\* pin accepts Si4423 tx clock *\/ */
   P2IES |= XMIT_CLOCK_PIN;      /* high-to-low requests interrupt */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
   P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
@@ -92,7 +102,7 @@ void xmit_tone_start() {
   P2IE  |= XMIT_CLOCK_PIN;      /* enable audio interrupt */
   si4432_init_tx_direct();      /* start sending xmit clock */
   si4432_set_state(XMIT_DIRECT); /* start transmitting */
-  beeping = ON;
+  thiskey = ON;
 }
 
 void xmit_tone_stop() {
@@ -105,12 +115,12 @@ void xmit_tone_stop() {
 void xmit_morse_start() {
   aticker = AUDIO_TICKS;        /* start the audio clock */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
-  P2IE  |= XMIT_CLOCK_PIN;      /* enable audio interrupt */
   si4432_init_tx_direct();      /* start sending xmit clock */
-  beeping = init_tock();        /* point tock() at first letter */
+  thiskey = init_tock();        /* point tock() at first letter */
+  si4432_set_state(XMIT_DIRECT); /* start transmitting */
   TACCR1 = MORSE_TICKS;         /* set time until next interrupt */
   TACCTL1 = CCIE;               /* enable Morse interrupts */
-  si4432_set_state(XMIT_DIRECT); /* start transmitting */
+  P2IE |= XMIT_CLOCK_PIN;       /* enable audio interrupt */
 }
 
 /* Stop sending Morse code, but don't stop the timer */
@@ -153,6 +163,7 @@ void timer_stop() {
 
 int main(int argc, char *argv[])
 {
+  int i;
   configure_clocks();
   configure_pins();
   enable_spi();
@@ -180,11 +191,14 @@ int main(int argc, char *argv[])
 
   timer_start();
   xmit_morse_start();
-  __delay_cycles(160000000);     /* two seconds */
+  while (thiskey != DOWN);
+  __delay_cycles(16000000);
+  P2OUT |= NSEL_PIN;
   xmit_morse_stop();
   timer_stop();
   si4432_set_state(READY);
-  
+
+  P2OUT |= READY_LED_PIN;
   while (1);
   return 0;
 }

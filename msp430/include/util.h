@@ -7,7 +7,7 @@
 /* Macros to disable interrupts in critical sections */
 #define SR_ALLOC() uint16_t __sr
 #define ENTER_CRITICAL() __sr = _get_interrupt_state(); __disable_interrupt()
-#define EXIT_CRITICAL() __set_interrupt_state(__sr)
+#define EXIT_CRITICAL() __set_interrupt_state(__sr); __nop()
 
 
 /* Set or clear bits in mask for port 1 (P1OUT) */

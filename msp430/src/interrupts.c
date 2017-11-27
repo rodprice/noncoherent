@@ -15,7 +15,8 @@ volatile uint32_t clock;        /* real-time clock */
 volatile uint16_t galois;       /* m-sequence shift register */
 volatile uint16_t mticker;      /* counts periods of m-sequences */
 volatile uint8_t  aticker;      /* counts audio tone half-periods */
-volatile key beeping;           /* audio/transmitter state */
+volatile key thiskey;           /* audio/transmitter state */
+volatile key lastkey;           /* lagging audio/transmitter state */
 
 /* M-sequence generation */
 __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
@@ -33,6 +34,17 @@ __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
   }
 }
 
+/* The Si4432 transmitter seems to need a cooling off period after being told
+   to go to READY mode.  That is, you tell it to go to READY mode while in
+   direct transmission mode, and maybe it will and maybe it won't.  The Si4432
+   documentation says that the power amp "ramps down" over a period of 5-20
+   usecs.  The following code tells the radio to go to READY mode when tock()
+   returns DOWN, but it leaves the Morse interrupt on.  When the next Morse
+   interrupt occurs, it tells the radio to go to READY mode again, but this
+   time it turns off the Morse interrupts.  This presumably gives the radio its
+   cooling off period without requiring a busy-wait.  In any event, it seems to
+   work.  Kind of like working with a toddler... */
+
 /* Morse code generation and clock */
 __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
   switch(__even_in_range(TAIV,TAIV_TAIFG))
@@ -42,9 +54,31 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
 
     case TA0IV_TACCR1:          /* Morse interrupt pending */
       TACCR1 += MORSE_TICKS;    /* set up next interrupt */
-      beeping = tock();         /* get next key of Morse code */
-      if (beeping == DOWN)
-        xmit_morse_stop();
+      thiskey = tock();         /* get next key of Morse code */
+      
+      switch (thiskey) {        /* debug */
+      case ON:
+        P1OUT |= RXD_PIN;       /* ON */
+        P1OUT |= TXD_PIN;       /* UP */
+        break;
+      case OFF:
+        P1OUT &= ~RXD_PIN;      /* OFF */
+        P1OUT |= TXD_PIN;       /* UP */
+        break;
+      case DOWN:
+        P1OUT ^= RXD_PIN;       /* toggle to see interrupts */
+        P1OUT &= ~TXD_PIN;      /* DOWN */
+        break;
+      }                         /* end debug */
+      
+      if (thiskey == DOWN && lastkey == DOWN) {
+        xmit_morse_stop();      /* stop transmitting, stop interrupts */
+        return;
+      }
+      if (thiskey == DOWN) {
+        si4432_set_state(READY); /* stop transmitting */
+      }
+      lastkey = thiskey;
       return;
 
     case TA0IV_TAIFG:           /* timer overflow interrupt */
@@ -67,6 +101,9 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
     if (iflags2 & ipor) {       /* Si4432 power-on reset complete */
       return;
     }
+    if (iflags2 & ichiprdy) {   /* Si4432 chip ready (xtal on) */
+      return;
+    }
     if (iflags1 & ipksent) {    /* packet transmission complete */
       xmit_packet_stop();       /* turn off transmitter */
       return;
@@ -76,7 +113,7 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
   /* Transmit clock interrupt handler */
   if (P2IFG & XMIT_CLOCK_PIN) { /* beeps, or not -- single FM tone */
     P2IFG &= ~XMIT_CLOCK_PIN;   /* clear the interrupt flag */
-    if (beeping == ON) {        /* determined elsewhere */
+    if (thiskey == ON) {        /* determined elsewhere */
       if (--aticker == 0) {     /* time to shift GFSK frequency? */
         aticker = AUDIO_TICKS;  /* reset counter */
         P2OUT ^= XMIT_DATA_PIN; /* toggle transmit data output */

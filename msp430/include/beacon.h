@@ -10,8 +10,8 @@
 
 /* Port 1 pins */
 #define XMIT_LED_PIN  BIT0
-#define READY_LED_PIN BIT1
-#define BUTTON_PIN    BIT2
+#define RXD_PIN       BIT1
+#define TXD_PIN       BIT2
 #define TXON_PIN      BIT3
 #define RXON_PIN      BIT4
 #define SCK_PIN       BIT5
@@ -24,7 +24,7 @@
 #define GPIO2_PIN     BIT2
 #define NSEL_PIN      BIT3
 #define NIRQ_PIN      BIT4
-#define SDN_PIN       BIT5
+#define READY_LED_PIN BIT5
 
 /* Synonyms */
 #define XMIT_CLOCK_PIN GPIO0_PIN /* transmit clock from radio */
@@ -69,7 +69,7 @@
 
 /* Defines the time unit of the Morse code generator.  A Morse code
    rate of 5 wpm corresponds to a time unit of 240 ms.   */
-#define MORSE_TICKS 1024        /* 96 ms */
+#define MORSE_TICKS 256        /* 96 ms */
 
 #define MESSAGE "AD0YX sending m-sequence    "
 

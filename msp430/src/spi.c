@@ -33,9 +33,6 @@ void enable_spi() {
   
   /* set up SPI pins */
   P2OUT |= NSEL_PIN;            /* make sure nSEL is high to start */
-  P2DIR |= NSEL_PIN;
-  P1SEL  |= ( SCK_PIN | SDO_PIN | SDI_PIN );
-  P1SEL2 |= ( SCK_PIN | SDO_PIN | SDI_PIN );
 
   /* ready to go */
   UCB0CTL1 &= ~UCSWRST;

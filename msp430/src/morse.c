@@ -15,7 +15,7 @@
 
 
 /* What to say */
-static const char message[] = "AD0YX send";
+static const char message[] = "s";
 extern volatile key lastkey;    /* lagging Morse key state */
 
 #define SPACE_CODE 0x00
@@ -121,6 +121,7 @@ key init_tock() {
   letter = 0;
   symbols = next_letter();
   keys = next_short_symbol();
+  lastkey = DOWN;
   return DOWN;
 }
 

@@ -17,7 +17,7 @@ void si4432_reset() {
   value = spi_read_register(Si4432_INTERRUPT_STATUS1);
   value = spi_read_register(Si4432_INTERRUPT_STATUS2);
   if (value | ipor)
-    P1OUT |= READY_LED_PIN;       /* turn on power light */
+    P2OUT |= READY_LED_PIN;     /* turn on power light */
 }
 
 /* Check that communication over the SPI bus is taking place */
@@ -26,7 +26,7 @@ void si4432_check_device() {
   /* Read device type register, check result */
   type = spi_read_register(Si4432_DEVICE_TYPE);
   while (type != device_type_code) {
-    P1OUT ^= READY_LED_PIN;     /* if wrong, blink ready light */
+    P2OUT ^= READY_LED_PIN;     /* if wrong, blink ready light */
     __delay_cycles(120000);
   }
   /* Read device version register, check result */
@@ -35,6 +35,7 @@ void si4432_check_device() {
     P1OUT ^= XMIT_LED_PIN;      /* if wrong, blink xmit light */
     __delay_cycles(120000);
   }
+  P2OUT |= READY_LED_PIN;       /* turn on power light */
 }
 
 /* Set up Si4432 GPIO pins for direct mode transmission */
