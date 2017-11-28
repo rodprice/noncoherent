@@ -13,6 +13,7 @@ extern volatile uint32_t clock;  /* increments every two seconds */
 extern volatile uint8_t aticker; /* counts audio tone half-periods */
 extern volatile key thiskey;     /* audio/transmitter state */
 
+static uint8_t morsering[16];    /* ring buffer working area */
 
 /* Read calibration data from TLV, verify checksum */
 /* http://www.simplyembedded.org/tutorials/msp430-configuration/ */
@@ -116,7 +117,6 @@ void xmit_morse_start() {
   aticker = AUDIO_TICKS;        /* start the audio clock */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
   si4432_init_tx_direct();      /* start sending xmit clock */
-  thiskey = init_tock();        /* point tock() at first letter */
   si4432_set_state(XMIT_DIRECT); /* start transmitting */
   TACCR1 = MORSE_TICKS;         /* set time until next interrupt */
   TACCTL1 = CCIE;               /* enable Morse interrupts */
@@ -164,6 +164,7 @@ void timer_stop() {
 int main(int argc, char *argv[])
 {
   int i;
+  ringbuffer rb;
   configure_clocks();
   configure_pins();
   enable_spi();
@@ -177,17 +178,13 @@ int main(int argc, char *argv[])
   enable_nirq();
   enable_clock_irq();
 
+  rb = rbnew(morsering, 16);
+  rbput(&rb, 't');
+  rbput(&rb, 's');
+  thiskey = init_tock(&rb);
+
   __nop();
   __enable_interrupt();
-
-  /* si4432_load_packet("hi there again", 14); */
-  /* xmit_packet_start(); */
-  /* __delay_cycles(800000); */
-  /* xmit_packet_stop(); */
-
-  /* xmit_tone_start(); */
-  /* __delay_cycles(4000000);      /\* half-second *\/ */
-  /* xmit_tone_stop(); */
 
   timer_start();
   xmit_morse_start();

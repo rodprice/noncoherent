@@ -16,6 +16,8 @@
 
 /* What to say */
 static const char message[] = "s";
+
+static ringbuffer* buffer;      /* pointer to Morse code input buffer */
 extern volatile key lastkey;    /* lagging Morse key state */
 
 #define SPACE_CODE 0x00
@@ -73,7 +75,7 @@ static uint8_t letter;          /* points to current letter in message */
 
 
 /* Get the current key (MSB) and queue up the next one */
-key next_key() {
+static key next_key() {
   key out;
   out = (keys & 0x80) ? ON : OFF ;
   keys = SHIFT(keys);
@@ -81,12 +83,12 @@ key next_key() {
 }
 
 /* Have we sent the entire symbol (all the keys)? */
-bool done_symbol() {
+static bool done_symbol() {
   return keys == 0xFF;
 }
 
 /* Get the next symbol, including a one-unit space between the last */
-shifter next_short_symbol() {
+static shifter next_short_symbol() {
   bool out;
   out = (symbols & 0x80) ? DASH : DOT ;
   symbols = SHIFT(symbols);
@@ -94,7 +96,7 @@ shifter next_short_symbol() {
 }
 
 /* Get the next symbol, including a three-unit space between the last */
-shifter next_long_symbol() {
+static shifter next_long_symbol() {
   bool out;
   out = (symbols & 0x80) ? DELAY_DASH : DELAY_DOT ;
   symbols = SHIFT(symbols);
@@ -102,22 +104,25 @@ shifter next_long_symbol() {
 }
 
 /* Have we sent the entire letter (all the symbols)? */
-bool done_letter() {
+static bool done_letter() {
   return (symbols == 0x00) || (symbols == 0xFF);
 }
 
 /* Get the next letter in the message */
-char next_letter() {
-  return ascii2morse(message[letter++]);
+static char next_letter() {
+  return ascii2morse(rbget(buffer));
+  /* return ascii2morse(message[letter++]); */
 }
 
 /* Have we sent all the letters (excluding the NULL at the end)? */
-bool done_message() {
-  return (letter >= sizeof(message) || message[letter] == 0);
+static bool done_message() {
+  return rbempty(buffer);
+  /* return (letter >= sizeof(message) || message[letter] == 0); */
 }
 
 /* Load up the first symbol and key, but don't send yet */
-key init_tock() {
+key init_tock(ringbuffer *rb) {
+  buffer = rb;
   letter = 0;
   symbols = next_letter();
   keys = next_short_symbol();

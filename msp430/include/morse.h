@@ -8,6 +8,7 @@
 #define MORSE_H
 
 #include <stdint.h>
+#include "ringbuffer.h"
 
 
 /*
@@ -113,11 +114,8 @@ typedef enum { ON, OFF, DOWN } key;
 /* Change an ASCII code into a Morse code */
 uint8_t ascii2morse(char ascii);
 
-/* Is it done yet?  Is it done yet?  Is it done yet? */
-uint8_t donemsg();
-
 /* Initialize the Morse code generator */
-key inittock();
+key init_tock(ringbuffer *rb);
 
 /* Generate Morse code sequence */
 key tock();
