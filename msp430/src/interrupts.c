@@ -9,14 +9,19 @@
 #include "msequence.h"
 #include "morse.h"
 #include "si4432.h"
+#include "uart.h"
 
+
+extern ringbuffer *uart_rx_rb;  /* UART receive buffer */
 
 volatile uint32_t clock;        /* real-time clock */
 volatile uint16_t galois;       /* m-sequence shift register */
 volatile uint16_t mticker;      /* counts periods of m-sequences */
 volatile uint8_t  aticker;      /* counts audio tone half-periods */
+
 volatile key thiskey;           /* audio/transmitter state */
 volatile key lastkey;           /* lagging audio/transmitter state */
+
 
 /* M-sequence generation */
 __attribute__((interrupt(TIMER0_A0_VECTOR))) void mseq_isr(void) {
@@ -55,21 +60,6 @@ __attribute__((interrupt(TIMER0_A1_VECTOR))) void morse_isr(void) {
     case TA0IV_TACCR1:          /* Morse interrupt pending */
       TACCR1 += MORSE_TICKS;    /* set up next interrupt */
       thiskey = tock();         /* get next key of Morse code */
-      
-      switch (thiskey) {        /* debug */
-      case ON:
-        P1OUT |= RXD_PIN;       /* ON */
-        P1OUT |= TXD_PIN;       /* UP */
-        break;
-      case OFF:
-        P1OUT &= ~RXD_PIN;      /* OFF */
-        P1OUT |= TXD_PIN;       /* UP */
-        break;
-      case DOWN:
-        P1OUT ^= RXD_PIN;       /* toggle to see interrupts */
-        P1OUT &= ~TXD_PIN;      /* DOWN */
-        break;
-      }                         /* end debug */
       
       if (thiskey == DOWN && lastkey == DOWN) {
         xmit_morse_stop();      /* stop transmitting, stop interrupts */
@@ -122,11 +112,21 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
   }
 }
 
+
+/* UART receive interrupt handler */
+__attribute__((interrupt(USCIAB0RX_VECTOR))) void usci_rx_isr (void) {
+  volatile uint8_t iflags2 = IFG2;
+  if (iflags2 & UCA0RXIFG) {
+    IFG2 &= ~UCA0RXIFG;         /* clear the interrupt flag */
+    rbput(uart_rx_rb, UCA0RXBUF); /* put received byte in ring buffer */
+  }
+}
+
+
 /* Define empty ISRs */
 __attribute__((interrupt(TRAPINT_VECTOR)))     void trapint_isr (void) {;}
 __attribute__((interrupt(PORT1_VECTOR)))       void port1_isr   (void) {;}
 __attribute__((interrupt(ADC10_VECTOR)))       void adc10_isr   (void) {;}
 __attribute__((interrupt(USCIAB0TX_VECTOR)))   void usci_tx_isr (void) {;}
-__attribute__((interrupt(USCIAB0RX_VECTOR)))   void usci_rx_isr (void) {;}
 __attribute__((interrupt(WDT_VECTOR)))         void wdt_isr     (void) {;}
 __attribute__((interrupt(COMPARATORA_VECTOR))) void compa_isr   (void) {;}

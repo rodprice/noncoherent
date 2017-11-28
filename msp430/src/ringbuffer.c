@@ -60,3 +60,10 @@ uint8_t rbget(ringbuffer* rb) {
   return data;
 }
 
+uint8_t rbpeek(ringbuffer* rb) {
+  uint8_t data = -1;
+    if (!rbempty(rb)) {
+    data = rb->buffer[rb->tail & (rb->len-1)];
+  }
+  return data;
+}

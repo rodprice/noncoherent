@@ -65,12 +65,12 @@ void configure_pins() {
   P1SEL  |= ( SCK_PIN | SDO_PIN | SDI_PIN );
   P1SEL2 |= ( SCK_PIN | SDO_PIN | SDI_PIN );
   /* Set up UART pins */
-  /* P1SEL  |= ( RXD_PIN | TXD_PIN ); */
-  /* P1SEL2 |= ( RXD_PIN | TXD_PIN ); */
-  P1OUT &= ~RXD_PIN;            /* debug */
-  P1OUT &= ~TXD_PIN;            /* debug */
-  P1DIR |= RXD_PIN;             /* debug */
-  P1DIR |= TXD_PIN;             /* debug */
+  P1SEL  |= ( RXD_PIN | TXD_PIN );
+  P1SEL2 |= ( RXD_PIN | TXD_PIN );
+  /* P1OUT &= ~RXD_PIN;            /\* debug *\/ */
+  /* P1OUT &= ~TXD_PIN;            /\* debug *\/ */
+  /* P1DIR |= RXD_PIN;             /\* debug *\/ */
+  /* P1DIR |= TXD_PIN;             /\* debug *\/ */
 }
 
 /* Enable interrupts on the nIRQ pin */
@@ -89,9 +89,6 @@ void disable_nirq() {
 
 /* Enable interrupts from the radio for direct mode transmission */
 void enable_clock_irq() {
-  /* P2DIR |= XMIT_DATA_PIN;       /\* pin drives Si4432 tx data *\/ */
-  /* P2DIR &= ~RECV_DATA_PIN;      /\* pin accepts Si4432 rx data *\/ */
-  /* P2DIR &= ~XMIT_CLOCK_PIN;     /\* pin accepts Si4423 tx clock *\/ */
   P2IES |= XMIT_CLOCK_PIN;      /* high-to-low requests interrupt */
   P2IFG &= ~XMIT_CLOCK_PIN;     /* clear flag, just in case */
   P2IE  |= XMIT_CLOCK_PIN;      /* enable interrupt on pin */  
@@ -164,7 +161,10 @@ void timer_stop() {
 int main(int argc, char *argv[])
 {
   int i;
-  ringbuffer rb;
+  uint8_t rring[16];
+  ringbuffer rrb, trb;
+  char* greeting = "happy birthday!";
+  
   configure_clocks();
   configure_pins();
   enable_spi();
@@ -178,13 +178,23 @@ int main(int argc, char *argv[])
   enable_nirq();
   enable_clock_irq();
 
-  rb = rbnew(morsering, 16);
-  rbput(&rb, 't');
-  rbput(&rb, 's');
-  thiskey = init_tock(&rb);
+  trb = rbnew(morsering, 16);
+  rbput(&trb, 't');
+  rbput(&trb, 's');
+  thiskey = init_tock(&trb);
 
   __nop();
   __enable_interrupt();
+
+  rrb = rbnew(rring, 16);
+  uart_init(&rrb);
+  uart_send_string_ln(greeting, 15);
+  while (1) {
+    while (rbempty(&rrb));
+    if (rbpeek(&rrb) == '\r')
+      rbput(&rrb, '\n');
+    uart_send_buffer(&rrb);
+  }
 
   timer_start();
   xmit_morse_start();

@@ -35,6 +35,9 @@ uint8_t rbempty(ringbuffer* rb);
 /* Gets the head of the ring buffer, -1 if empty */
 uint8_t rbget(ringbuffer* rb);
 
+/* Gets the head of the ring buffer, but does not move the pointer */
+uint8_t rbpeek(ringbuffer* rb);
+
 /* Puts a new uint8_t at the tail of the ring buffer */
 uint8_t rbput(ringbuffer* rb, uint8_t data);
 
