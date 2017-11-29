@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
   uart_send_string_ln(greeting, 15);
   while (1) {
     while (rbempty(&rrb));
-    if (rbpeek(&rrb) == '\r')
+    if (rbpeek(&rrb,0) == '\r')
       rbput(&rrb, '\n');
     uart_send_buffer(&rrb);
   }

@@ -54,6 +54,22 @@ uint8_t rbget(ringbuffer* rb) {
   return data;
 }
 
+/* Return the number of elements in the ringbuffer */
+uint8_t rblen(ringbuffer* rb) {
+  uint8_t wrapped;
+  wrapped = rb->head - rb->tail;
+  return wrapped;
+}
+
+/* Retrieve the n'th element in the ringbuffer */
+uint8_t rbpeek(ringbuffer* rb, uint8_t n) {
+  uint8_t wrapped;
+  wrapped = rb->head - n;
+  return rb->buffer[wrapped];
+}
+
+
+
 #if DEBUG_RINGBUFFER
 
 #include <stdio.h>

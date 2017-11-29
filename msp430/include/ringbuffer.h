@@ -35,11 +35,17 @@ uint8_t rbempty(ringbuffer* rb);
 /* Gets the head of the ring buffer, -1 if empty */
 uint8_t rbget(ringbuffer* rb);
 
-/* Gets the head of the ring buffer, but does not move the pointer */
-uint8_t rbpeek(ringbuffer* rb);
-
 /* Puts a new uint8_t at the tail of the ring buffer */
 uint8_t rbput(ringbuffer* rb, uint8_t data);
 
+/* Concatenate a string onto a ringbuffer */
+uint8_t rbconcat(ringbuffer* rb, uint8_t* string, uint8_t len);
 
+/* Return the number of elements in the ringbuffer */
+uint8_t rblen(ringbuffer* rb);
+
+/* Retrieve the n'th element in the ringbuffer without moving pointers */
+uint8_t rbpeek(ringbuffer* rb, uint8_t n);
+
+  
 #endif

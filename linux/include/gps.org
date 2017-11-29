@@ -1,0 +1,37 @@
+#+TITLE: GPS notes
+#+DATE: <2017-11-28 Tue 19:36><2017-11-28 Tue 19:36>
+#+AUTHOR: Rodney Price
+#+EMAIL: rod@kobe
+#+DESCRIPTION: Notes for GPS communications with Adafruit Ultimate GPS
+#+KEYWORDS: gps
+#+STARTUP: showall
+#+OPTIONS: LaTeX:t
+
+| field       | length   | type   | description                          |
+|-------------+----------+--------+--------------------------------------|
+| preamble    | 1 byte   | char   | "$"                                  |
+| talker ID   | 4 byte   | string | "PMTK"                               |
+| packet type | 3 byte   | string | identifiers "000" to "999"           |
+| data field  | variable |        | comma-separated variables            |
+| *           | 1 byte   | char   | marks the end of the data field      |
+| CHK1,CHK2   | 2 byte   | string | checksum of data between "," and "*" |
+| CR,LF       | 2 byte   | string | marks the end of a packet            |
+
+
+| type        | syntax            | data field              | example                   |
+|-------------+-------------------+-------------------------+---------------------------|
+| test packet |                   | none                    | $PMTK000*32<cr><lf>       |
+| ack packet  | $PMTK001,cmd,flag | 0 = invalid command     | $PMTK001,604,3*32<cr><lf> |
+|             |                   | 1 = unsupported command |                           |
+|             |                   | 2 = valid, but failed   |                           |
+|             |                   | 3 = valid, succeeded    |                           |
+| system msg  | $PMTK010,msg      | 0 = unknown             | $PMTK010,001*2E,<cr><lf>  |
+|             |                   | 1 = startup             |                           |
+|             |                   | 2 = notify: host        |                           |
+|             |                   | 3 = notify: to normal   |                           |
+
+When the GPS module is powered-on or restarted via command, both
+"$PMTK010,001*2E<CR><LF>" and $PMTK011,MTKGPS*08<CR><LF>" will be
+returned at the same time after GPS engine has successfully completed
+boot-up stage.
+

@@ -41,6 +41,15 @@ uint8_t rbempty(ringbuffer* rb) {
   return ((rb->head - rb->tail) == 0);
 }
 
+uint8_t rbget(ringbuffer* rb) {
+  uint8_t data = -1;
+  if (!rbempty(rb)) {
+    data = rb->buffer[rb->tail & (rb->len-1)];
+    rb->tail++;   /* incrementing tail here avoids need for lock */
+  }
+  return data;
+}
+
 uint8_t rbput(ringbuffer* rb, uint8_t data) {
   if (!rbfull(rb)) {
     rb->buffer[rb->head & (rb->len-1)] = data;
@@ -51,19 +60,30 @@ uint8_t rbput(ringbuffer* rb, uint8_t data) {
   }
 }
 
-uint8_t rbget(ringbuffer* rb) {
-  uint8_t data = -1;
-  if (!rbempty(rb)) {
-    data = rb->buffer[rb->tail & (rb->len-1)];
-    rb->tail++;   /* incrementing tail here avoids need for lock */
+/* Concatenate a string onto a ringbuffer */
+uint8_t rbconcat(ringbuffer* rb, uint8_t* string, uint8_t len) {
+  uint8_t i;
+  if (len > rb->len)
+    return -1;
+  for (i=0; i<len; i++) {
+    if (rbput(rb, string[i]) != 0)
+      return -1
   }
-  return data;
+  return 0;
 }
 
-uint8_t rbpeek(ringbuffer* rb) {
+/* Return the number of elements in the ringbuffer */
+uint8_t rblen(ringbuffer* rb) {
+  uint8_t wrapped;
+  wrapped = rb->head - rb->tail;
+  return wrapped;
+}
+
+/* Retrieve the n'th element in the ringbuffer */
+uint8_t rbpeek(ringbuffer* rb, uint8_t n) {
   uint8_t data = -1;
     if (!rbempty(rb)) {
-    data = rb->buffer[rb->tail & (rb->len-1)];
-  }
-  return data;
+      data = rb->buffer[(rb->tail + n) & (rb->len-1)];
+    }
+    return data;
 }

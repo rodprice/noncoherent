@@ -38,6 +38,12 @@ uint8_t rbget(ringbuffer* rb);
 /* Puts a new uint8_t at the tail of the ring buffer */
 uint8_t rbput(ringbuffer* rb, uint8_t data);
 
+/* Return the number of elements in the ringbuffer */
+uint8_t rblen(ringbuffer* rb);
+
+/* Retrieve the n'th element in the ringbuffer */
+uint8_t rbpeek(ringbuffer* rb, uint8_t n);
+
 /* testing only -- print contents of buffer */
 void rbqueue(ringbuffer* rb);
 void rbprint(ringbuffer* rb);
