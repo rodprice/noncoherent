@@ -9,17 +9,72 @@
 #define BR1  0                  /* UCA0BR1 */
 #define MCTL 2                  /* UCA0MCTL */
 
-ringbuffer *uart_rx_rb;         /* UART receive buffer */
+/* Callbacks for UART receive and transmit */
+extern void (*uart_rx_callback)(char character);
+extern void (*uart_tx_callback)();
 
-void uart_init(ringbuffer *rb) {
-  uart_rx_rb = rb;              /* make buffer available to interrupt routine */
+static ringbuffer *uart_rx_rb;  /* callback recv buffer */
+static ringbuffer *uart_tx_rb;  /* callback xmit buffer */
+
+static uint8_t uart_rx_dropped; /* counts dropped characters */
+
+/* Don't do anything */
+void uart_stub() {}
+
+/* Echo the received byte back through the UART */
+void uart_echo(char character) {
+  uart_send(character);
+  if (character == '\r')
+    uart_send('\n');
+}
+
+static void xmit_buffer_callback() {
+  if (!rbempty(uart_tx_rb)) {
+    UCA0TXBUF = rbget(uart_tx_rb); /* send next character in buffer */   
+  } else {
+    IE2 &= ~UCA0TXIE;           /* done; turn off xmit interrupts */
+  }
+}
+
+void uart_xmit_buffer(ringbuffer *rb) {
+  uart_tx_rb = rb;
+  uart_tx_callback = xmit_buffer_callback;
+  if (!rbempty(rb)) {            /* if buffer empty, do nothing */
+    while (!(IFG2 & UCA0TXIFG)); /* wait for transmit buffer */
+    IE2 |= UCA0TXIE;             /* enable UCA0 xmit interrupts */
+    UCA0TXBUF = rbget(rb);       /* send first character in buffer */   
+  }
+}
+
+static void recv_buffer_callback(char character) {
+  if (rbput(uart_rx_rb, character == error)) {
+    if (uart_rx_dropped != -1)  /* don't wrap count back to zero */
+      uart_rx_dropped++;        /* but count dropped characters */
+  }
+}
+
+void uart_recv_buffer(ringbuffer *rb) {
+  uart_rx_rb = rb;
+  uart_rx_callback = recv_buffer_callback;
+  if (!rbfull(rb)) {            /* if buffer full, do nothing */
+    uart_rx_dropped = 0;        /* no characters dropped yet */
+    IE2 |= UCA0RXIE;            /* turn on recv interrupt */
+  }
+}
+
+void uart_init() {
   UCA0CTL1 |= UCSWRST;          /* hold UART UCA0 in reset */
   UCA0CTL1 |= UCSSEL_2;         /* clock source is SMCLK */
   UCA0BR0 = BR0;                /* set the baud rate */
   UCA0BR1 = BR1;
   UCA0MCTL = MCTL;              /* modulation control */
   UCA0CTL1 &= ~UCSWRST;         /* enable UART */
-  IE2 |= UCA0RXIE;              /* enable UCA0 interrupts */
+}
+
+uint8_t uart_stop() {
+  IE2 &= ~UCA0RXIE;             /* disable UCA0 recv interrupts */
+  IE2 &= ~UCA0TXIE;             /* disable UCA0 xmit interrupts */
+  return uart_rx_dropped;
 }
 
 void uart_send(char character) {

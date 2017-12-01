@@ -1,5 +1,6 @@
 
 #include "pmtk.h"
+#include "util.h"
 #include "ringbuffer.h"
 
 
@@ -8,9 +9,9 @@ static uint8_t ascii2hex(char ch) {
   if ((48 <= ch) && (ch <58))
     return ch-48;
   if ((65 <= ch) && (ch < 71))
-    return ch - 65 + 10;
+    return ch - 55;
   if ((97 <= ch) && (ch < 107))
-    return ch - 97 + 10;
+    return ch - 87;
   return 0xFF;
 }
 
@@ -19,7 +20,7 @@ static uint8_t hex2ascii(uint8_t byte) {
   if (byte < 10)
     return byte + 48;
   if (byte < 16)
-    return byte + 65;
+    return byte + 55;
   return 0xFF;
 }
 
@@ -59,8 +60,8 @@ uint8_t pmtk_checksum(ringbuffer *rb) {
   return 0xFF;
 }
 
-/* Confirm that the checksum is correct */
-uint8_t pmtk_checksum_confirm(ringbuffer *rb) {
+/* Confirm that the checksum in a sentence is correct */
+bool pmtk_checksum_confirm(ringbuffer *rb) {
   uint8_t i, n, msb, lsb, sum, star = 0;
   /* find out where the '*' is */
   n = rblen(rb);
@@ -81,23 +82,22 @@ uint8_t pmtk_checksum_confirm(ringbuffer *rb) {
   return sum == pmtk_checksum(rb);
 }
 
-bool pmtk_make_string_header(ringbuffer *rb, char* type) {
+bool pmtk_make_sentence_header(ringbuffer *rb, char* type) {
   /* PMTK string should be the only thing in the buffer */
   if (!rbempty(rb))
     return false;
-  if (rbconcat(rb, "$PMTK", 5) == false)
-    return false;
-  if (rbconcat(rb, type, 3) == false)
-    return false;
+  if (rbconcat(rb, "$PMTK", 5) == error) return false;
+  if (rbconcat(rb, type, 3)    == error) return false;
+  if (rbput(rb, ',')           == error) return false;
   return true;
 }
 
-bool pmtk_make_string_footer(ringbuffer *rb) {
+bool pmtk_make_sentence_footer(ringbuffer *rb) {
   uint8_t sum;
-  if (!rbput(rb,'*')) return false;
+  if (rbput(rb,'*') == error) return false;
   sum = pmtk_checksum(rb);
-  if (!byte2hex(rb, sum)) return false;
-  if (!rbput(rb, '\r')) return false;
-  if (!rbput(rb, '\n')) return false;
+  if (byte2hex(rb, sum) == error) return false;
+  if (rbput(rb, '\r')   == error) return false;
+  if (rbput(rb, '\n')   == error) return false;
   return true;
 }

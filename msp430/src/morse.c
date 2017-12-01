@@ -12,6 +12,7 @@
 #include <msp430.h>
 #include "morse.h"
 #include "beacon.h"
+#include "util.h"
 
 
 /* What to say */
@@ -27,7 +28,6 @@ extern volatile key lastkey;    /* lagging Morse key state */
 #define DELAY_DASH 0b00111011   /* 0x3B or  59 */
 #define SPACE      0b00001111   /* 0x0F or  15 */
 
-#define bool uint8_t            /* not the C99 bool type! */
 #define shifter uint8_t         /* shift register */
 
 /* Left shift that preserves the LSB */
@@ -111,13 +111,11 @@ static bool done_letter() {
 /* Get the next letter in the message */
 static char next_letter() {
   return ascii2morse(rbget(buffer));
-  /* return ascii2morse(message[letter++]); */
 }
 
 /* Have we sent all the letters (excluding the NULL at the end)? */
 static bool done_message() {
   return rbempty(buffer);
-  /* return (letter >= sizeof(message) || message[letter] == 0); */
 }
 
 /* Load up the first symbol and key, but don't send yet */

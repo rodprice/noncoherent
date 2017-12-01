@@ -2,6 +2,7 @@
 #define GPS_H
 
 #include <stdint.h>
+#include "util.h"
 #include "ringbuffer.h"
 
 
@@ -139,13 +140,13 @@
 uint8_t pmtk_checksum(ringbuffer *rb);
 
 /* Confirm that checksum is correct */
-uint8_t pmtk_checksum_confirm(ringbuffer *rb);
+bool pmtk_checksum_confirm(ringbuffer *rb);
 
 /* Put a type header for a PMTK string in the buffer */
-bool pmtk_make_string_header(ringbuffer *rb, char* type);
+bool pmtk_make_sentence_header(ringbuffer *rb, char* type);
 
 /* Once the body is in the buffer, make the PMTK footer */
-bool pmtk_make_string_footer(ringbuffer *rb);
+bool pmtk_make_sentence_footer(ringbuffer *rb);
 
 
 /*******************************************************************************

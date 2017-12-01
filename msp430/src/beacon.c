@@ -13,7 +13,7 @@ extern volatile uint32_t clock;  /* increments every two seconds */
 extern volatile uint8_t aticker; /* counts audio tone half-periods */
 extern volatile key thiskey;     /* audio/transmitter state */
 
-static uint8_t morsering[16];    /* ring buffer working area */
+static uint8_t morsering[64];    /* ring buffer working area */
 
 /* Read calibration data from TLV, verify checksum */
 /* http://www.simplyembedded.org/tutorials/msp430-configuration/ */
@@ -178,9 +178,9 @@ int main(int argc, char *argv[])
   enable_nirq();
   enable_clock_irq();
 
-  trb = rbnew(morsering, 16);
-  rbput(&trb, 't');
-  rbput(&trb, 's');
+  trb = rbnew(morsering, 64);
+  /* rbput(&trb, 'e'); */
+  /* rbput(&trb, 't'); */
   thiskey = init_tock(&trb);
 
   __nop();
@@ -189,13 +189,22 @@ int main(int argc, char *argv[])
   rrb = rbnew(rring, 16);
   uart_init(&rrb);
   uart_send_string_ln(greeting, 15);
-  while (1) {
-    while (rbempty(&rrb));
-    if (rbpeek(&rrb,0) == '\r')
-      rbput(&rrb, '\n');
-    uart_send_buffer(&rrb);
-  }
+  while (1);
+  /*   while (rbempty(&rrb)); */
+  /*   if (rbpeek(&rrb,0) == '\r') */
+  /*     rbput(&rrb, '\n'); */
+  /*   uart_send_buffer(&rrb); */
+  /* } */
 
+  uart_init(&trb);
+  pmtk_make_sentence_header(&trb, "352");
+  rbconcat(&trb, "1", 1);
+  pmtk_make_sentence_footer(&trb);
+  if (pmtk_checksum_confirm(&trb))
+    uart_send_buffer(&trb);
+  else
+    uart_send_string_ln("oops");
+  
   timer_start();
   xmit_morse_start();
   while (thiskey != DOWN);

@@ -12,7 +12,9 @@
 #include "uart.h"
 
 
-extern ringbuffer *uart_rx_rb;  /* UART receive buffer */
+/* Callbacks for UART receive and transmit */
+void (*uart_rx_callback)(char character) = uart_echo;
+void (*uart_tx_callback)() = uart_stub;
 
 volatile uint32_t clock;        /* real-time clock */
 volatile uint16_t galois;       /* m-sequence shift register */
@@ -112,13 +114,12 @@ __attribute__((interrupt(PORT2_VECTOR))) void si4432_isr(void) {
   }
 }
 
-
 /* UART receive interrupt handler */
 __attribute__((interrupt(USCIAB0RX_VECTOR))) void usci_rx_isr (void) {
   volatile uint8_t iflags2 = IFG2;
   if (iflags2 & UCA0RXIFG) {
-    IFG2 &= ~UCA0RXIFG;         /* clear the interrupt flag */
-    rbput(uart_rx_rb, UCA0RXBUF); /* put received byte in ring buffer */
+    IFG2 &= ~UCA0RXIFG;           /* clear the interrupt flag */
+    uart_rx_callback(UCA0RXBUF);  /* execute callback */
   }
 }
 

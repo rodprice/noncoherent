@@ -9,6 +9,7 @@
  * try to be as parsimonious with the stack as possible.
  */
 
+#include "util.h"
 #include "ringbuffer.h"
 
 
@@ -42,7 +43,7 @@ uint8_t rbempty(ringbuffer* rb) {
 }
 
 uint8_t rbget(ringbuffer* rb) {
-  uint8_t data = -1;
+  uint8_t data = error;
   if (!rbempty(rb)) {
     data = rb->buffer[rb->tail & (rb->len-1)];
     rb->tail++;   /* incrementing tail here avoids need for lock */
@@ -56,7 +57,7 @@ uint8_t rbput(ringbuffer* rb, uint8_t data) {
     rb->head++;
     return 0;
   } else {
-    return -1;
+    return error;
   }
 }
 
@@ -67,7 +68,7 @@ uint8_t rbconcat(ringbuffer* rb, uint8_t* string, uint8_t len) {
     return -1;
   for (i=0; i<len; i++) {
     if (rbput(rb, string[i]) != 0)
-      return -1
+      return error;
   }
   return 0;
 }
@@ -81,7 +82,7 @@ uint8_t rblen(ringbuffer* rb) {
 
 /* Retrieve the n'th element in the ringbuffer */
 uint8_t rbpeek(ringbuffer* rb, uint8_t n) {
-  uint8_t data = -1;
+  uint8_t data = error;
     if (!rbempty(rb)) {
       data = rb->buffer[(rb->tail + n) & (rb->len-1)];
     }
