@@ -123,11 +123,19 @@ __attribute__((interrupt(USCIAB0RX_VECTOR))) void usci_rx_isr (void) {
   }
 }
 
+/* UART transmit interrupt handler */
+__attribute__((interrupt(USCIAB0TX_VECTOR))) void usci_tx_isr (void) {
+  volatile uint8_t iflags2 = IFG2;
+  if (iflags2 & UCA0TXIFG) {
+    IFG2 &= ~UCA0TXIFG;           /* clear the interrupt flag */
+    uart_tx_callback();           /* execute callback */
+  }
+}
+
 
 /* Define empty ISRs */
 __attribute__((interrupt(TRAPINT_VECTOR)))     void trapint_isr (void) {;}
 __attribute__((interrupt(PORT1_VECTOR)))       void port1_isr   (void) {;}
 __attribute__((interrupt(ADC10_VECTOR)))       void adc10_isr   (void) {;}
-__attribute__((interrupt(USCIAB0TX_VECTOR)))   void usci_tx_isr (void) {;}
 __attribute__((interrupt(WDT_VECTOR)))         void wdt_isr     (void) {;}
 __attribute__((interrupt(COMPARATORA_VECTOR))) void compa_isr   (void) {;}

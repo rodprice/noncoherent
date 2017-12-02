@@ -6,6 +6,9 @@
 /* Default recv callback; echo character through UART */
 void uart_echo(char character);
 
+/* Echo received characters back through the UART */
+void uart_recv_echo();
+
 /* Default xmit callback; do nothing */
 void uart_stub();
 

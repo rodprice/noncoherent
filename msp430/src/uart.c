@@ -21,11 +21,16 @@ static uint8_t uart_rx_dropped; /* counts dropped characters */
 /* Don't do anything */
 void uart_stub() {}
 
-/* Echo the received byte back through the UART */
+/* Echo received characters back through the UART */
 void uart_echo(char character) {
   uart_send(character);
   if (character == '\r')
     uart_send('\n');
+}
+
+void uart_recv_echo() {
+  uart_rx_callback = uart_echo;
+  IE2 |= UCA0RXIE;            /* turn on recv interrupt */
 }
 
 static void xmit_buffer_callback() {
@@ -41,13 +46,13 @@ void uart_xmit_buffer(ringbuffer *rb) {
   uart_tx_callback = xmit_buffer_callback;
   if (!rbempty(rb)) {            /* if buffer empty, do nothing */
     while (!(IFG2 & UCA0TXIFG)); /* wait for transmit buffer */
-    IE2 |= UCA0TXIE;             /* enable UCA0 xmit interrupts */
     UCA0TXBUF = rbget(rb);       /* send first character in buffer */   
+    IE2 |= UCA0TXIE;             /* enable UCA0 xmit interrupts */
   }
 }
 
 static void recv_buffer_callback(char character) {
-  if (rbput(uart_rx_rb, character == error)) {
+  if (rbput(uart_rx_rb, character) == error) {
     if (uart_rx_dropped != -1)  /* don't wrap count back to zero */
       uart_rx_dropped++;        /* but count dropped characters */
   }

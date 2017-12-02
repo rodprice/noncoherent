@@ -161,7 +161,7 @@ void timer_stop() {
 int main(int argc, char *argv[])
 {
   int i;
-  uint8_t rring[16];
+  uint8_t rring[32];
   ringbuffer rrb, trb;
   char* greeting = "happy birthday!";
   
@@ -179,16 +179,26 @@ int main(int argc, char *argv[])
   enable_clock_irq();
 
   trb = rbnew(morsering, 64);
-  /* rbput(&trb, 'e'); */
-  /* rbput(&trb, 't'); */
+  rbput(&trb, 'e');
+  rbput(&trb, 't');
   thiskey = init_tock(&trb);
 
   __nop();
   __enable_interrupt();
 
-  rrb = rbnew(rring, 16);
-  uart_init(&rrb);
-  uart_send_string_ln(greeting, 15);
+  uart_init();
+  rrb = rbnew(rring, 32);
+  uart_send('\r');
+  uart_send('\n');
+  rbconcat(&rrb, greeting, 15);
+  uart_send_buffer_ln(&rrb);
+  uart_send('\n');
+  rbconcat(&rrb, greeting, 15);
+  uart_xmit_buffer(&rrb);
+  rbconcat(&rrb, " again!\r\n", 9);
+  __delay_cycles(400000);
+  uart_stop();
+  uart_recv_echo();
   while (1);
   /*   while (rbempty(&rrb)); */
   /*   if (rbpeek(&rrb,0) == '\r') */
