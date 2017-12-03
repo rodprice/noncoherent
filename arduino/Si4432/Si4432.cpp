@@ -20,17 +20,17 @@ Si4432::Si4432() {
   _direct = false;
   // configure SPI
   pinMode(NSEL_PIN, OUTPUT);
-  pinMode(NIRQ_PIN, INPUT_PULLUP);
-  SPI.begin();
   digitalWrite(NSEL_PIN, HIGH);
+  pinMode(NIRQ_PIN, INPUT);
+  SPI.begin();
   // initialize static data
   for (uint8_t i=0; i<DATALEN; i++)
     _data[i] = 0;
   // configure Si4432 radio
-  // configure_gpio();
-  // set_frequency();
-  // packet_config();
-  // set_state(READY);
+  configure_gpio();
+  set_frequency();
+  packet_config();
+  set_state(READY);
   _delay_ms(10);
 }
 
@@ -52,9 +52,9 @@ uint8_t* Si4432::spi_read_burst(uint8_t addr, uint8_t *data, uint8_t len) {
   uint8_t i, value;
   SPI.beginTransaction(Si4432_SPI_SETTINGS);
   digitalWrite(NSEL_PIN, LOW);           // chip select active
-  value = SPI.transfer( 0 );             // send address
+  value = SPI.transfer( addr & ~BIT7 );  // send address
   for (i=0; i<len; i++)                  // read continuously
-    data[i] = SPI.transfer( addr & ~BIT7 );
+    data[i] = SPI.transfer( 0 );
   digitalWrite(NSEL_PIN, HIGH);          // chip select inactive
   SPI.endTransaction();
   return data;
@@ -66,7 +66,7 @@ void Si4432::spi_write_register(uint8_t addr, uint8_t data) {
   SPI.beginTransaction(Si4432_SPI_SETTINGS);
   digitalWrite(NSEL_PIN, LOW);           // chip select active
   value = SPI.transfer( addr | BIT7 );   // send address
-  value = SPI.transfer( 0 );             // send value
+  value = SPI.transfer( data );          // send value
   digitalWrite(NSEL_PIN, HIGH);          // chip select inactive
   SPI.endTransaction();
 }
@@ -78,7 +78,7 @@ void Si4432::spi_write_burst(uint8_t addr, uint8_t *data, uint8_t len) {
   digitalWrite(NSEL_PIN, LOW);           // chip select active
   value = SPI.transfer( addr | BIT7 );   // send address
   for (i=0; i<len; i++)                  // write continuously
-    data[i] = SPI.transfer( 0 );
+    value = SPI.transfer( data[i] );
   digitalWrite(NSEL_PIN, HIGH);          // chip select inactive
   SPI.endTransaction();
 }
@@ -190,7 +190,7 @@ bool Si4432::check_device() {
   return ((type == device_type_code) && (version == revision_B1));
 }
 
-// interrupt serive routine for direct mode
+// interrupt service routine for direct mode
 #define AUDIO_TICKS 4
 volatile uint16_t aticker = 0;
 volatile uint8_t signal = 0;

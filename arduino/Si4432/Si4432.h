@@ -493,7 +493,7 @@ public:
   bool xmit_packet(uint8_t *data, uint8_t len);
   uint8_t *recv_packet();
 
-protected:
+  //protected:
   void configure_gpio();
   void set_frequency();
   void init_tx_direct();
