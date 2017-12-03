@@ -193,45 +193,34 @@ bool Si4432::check_device() {
 // interrupt service routine for direct mode
 #define AUDIO_TICKS 4
 volatile uint16_t aticker = 0;
-volatile uint8_t signal = 0;
+volatile uint8_t signal = LOW;
 void direct_isr() {
-  aticker -= 1;
-  if (aticker == 0) {
-    aticker = AUDIO_TICKS;
-    digitalWrite(SDI_PIN, signal);
-    signal = signal ? false : true ;
+  if (--aticker == 0) {
+    aticker = AUDIO_TICKS;      // reset audio signal counter
+    signal = signal ? LOW : HIGH ; // toggle audio signal
+    digitalWrite(SDI_PIN, signal); // send signal to radio
   }
 }
 
 /* Transmit tone for `duration` milliseconds */
-bool Si4432::xmit_tone(uint16_t duration) {
+void Si4432::xmit_tone(uint16_t duration) {
   digitalWrite(NSEL_PIN, HIGH); // just to be sure
   init_tx_direct();             // tell radio to go to direct mode
-  digitalWrite(SDI_PIN, LOW);
-
-  Serial.print("xmit off; state = ");
-  Serial.println(spi_read_register(Si4432_CRYSTAL_OSCILLATOR_POR_CONTROL), HEX);
   set_state(XMIT_DIRECT);       // start transmission
-  for (int i=0; i<50; i++) {
-    Serial.print("xmit on; state = ");
-    Serial.println(spi_read_register(Si4432_CRYSTAL_OSCILLATOR_POR_CONTROL), HEX);
-  }
-  Serial.println("stopping SPI");
+  SPI.end();                    // turn off SPI so we can use SPI pins
   
-  SPI.end();                    // turn off so we can use SDI (MOSI)
-  pinMode(SDO_PIN, INPUT_PULLUP);
-  aticker = AUDIO_TICKS;
-  signal = 0;
+  signal = LOW;                 // initialize and attach audio interrupt
+  digitalWrite(SDI_PIN, LOW);   // we have to do this here because we're 
+  aticker = AUDIO_TICKS;        // using the SPI pins for other purposes
   attachInterrupt(digitalPinToInterrupt(SDO_PIN), direct_isr, FALLING);
-  _delay_ms(duration);
+  
+  _delay_ms(duration);          // wait while transmission occurs
+  
   detachInterrupt(digitalPinToInterrupt(SDO_PIN));
-  SPI.begin();
-  Serial.print("SPI back on, state = ");
-  Serial.println(show_state(get_power_state()));
-  set_state(READY);             // stop transmission
-  Serial.print("xmit off; state = ");
-  Serial.println(show_state(get_power_state()));
-  return true;
+  SPI.begin();                  // start talking to the radio again
+  set_state(READY);             // stop the transmission
+  _delay_ms(10);                // sometimes the radio doesn't listen
+  set_state(READY);             // so tell it to stop again
 }
 
 /* Set up Si4432 GPIO pins for use with Tinyduino */

@@ -24,6 +24,7 @@ void setup() {
     Serial.println("device check failed");
   Serial.print("initial state = ");
   Serial.println(radio.show_state(radio.get_state()));
+  radio.xmit_tone(500);
 }
 
 void loop() {

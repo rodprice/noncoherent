@@ -489,7 +489,7 @@ public:
   uint8_t status();
   bool reset();
   bool check_device();
-  bool xmit_tone(uint16_t duration);
+  void xmit_tone(uint16_t duration);
   bool xmit_packet(uint8_t *data, uint8_t len);
   uint8_t *recv_packet();
 
