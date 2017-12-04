@@ -179,46 +179,47 @@ int main(int argc, char *argv[])
   enable_clock_irq();
 
   trb = rbnew(morsering, 64);
-  rbput(&trb, 'e');
-  rbput(&trb, 't');
+  /* rbput(&trb, 'e'); */
+  /* rbput(&trb, 't'); */
+  rbconcat(&trb, "AD0YX sending m-sequence", 25);
   thiskey = init_tock(&trb);
 
   __nop();
   __enable_interrupt();
 
-  uart_init();
-  rrb = rbnew(rring, 32);
-  uart_send('\r');
-  uart_send('\n');
-  rbconcat(&rrb, greeting, 15);
-  uart_send_buffer_ln(&rrb);
-  uart_send('\n');
-  rbconcat(&rrb, greeting, 15);
-  uart_xmit_buffer(&rrb);
-  rbconcat(&rrb, " again!\r\n", 9);
-  __delay_cycles(400000);
-  uart_stop();
-  uart_recv_echo();
-  while (1);
+  /* uart_init(); */
+  /* rrb = rbnew(rring, 32); */
+  /* uart_send('\r'); */
+  /* uart_send('\n'); */
+  /* rbconcat(&rrb, greeting, 15); */
+  /* uart_send_buffer_ln(&rrb); */
+  /* uart_send('\n'); */
+  /* rbconcat(&rrb, greeting, 15); */
+  /* uart_xmit_buffer(&rrb); */
+  /* rbconcat(&rrb, " again!\r\n", 9); */
+  /* __delay_cycles(400000); */
+  /* uart_stop(); */
+  /* uart_recv_echo(); */
+  /* while (1); */
   /*   while (rbempty(&rrb)); */
   /*   if (rbpeek(&rrb,0) == '\r') */
   /*     rbput(&rrb, '\n'); */
   /*   uart_send_buffer(&rrb); */
   /* } */
 
-  uart_init(&trb);
-  pmtk_make_sentence_header(&trb, "352");
-  rbconcat(&trb, "1", 1);
-  pmtk_make_sentence_footer(&trb);
-  if (pmtk_checksum_confirm(&trb))
-    uart_send_buffer(&trb);
-  else
-    uart_send_string_ln("oops");
+  /* uart_init(&trb); */
+  /* pmtk_make_sentence_header(&trb, "352"); */
+  /* rbconcat(&trb, "1", 1); */
+  /* pmtk_make_sentence_footer(&trb); */
+  /* if (pmtk_checksum_confirm(&trb)) */
+  /*   uart_send_buffer(&trb); */
+  /* else */
+  /*   uart_send_string_ln("oops"); */
   
   timer_start();
   xmit_morse_start();
   while (thiskey != DOWN);
-  __delay_cycles(16000000);
+  __delay_cycles(160000000);
   P2OUT |= NSEL_PIN;
   xmit_morse_stop();
   timer_stop();

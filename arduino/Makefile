@@ -3,7 +3,7 @@
 
 # --- specific to this project
 USER_LIB_PATH := $(CURDIR)
-ARDUINO_LIBS = SPI Si4432
+ARDUINO_LIBS = SPI
 
 # --- assumes src and include directories exist
 SRC := src

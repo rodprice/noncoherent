@@ -18,6 +18,8 @@
  */
 
 #include <stdint.h>
+#include "config.h"
+
 
 // Arduino connections to Si4432 radio
 #define NSEL_PIN 7
@@ -476,7 +478,6 @@ typedef enum {
 
 
 class Si4432 {
-
 public:
   Si4432();
 
@@ -486,7 +487,11 @@ public:
   void spi_write_burst(uint8_t addr, uint8_t *data, uint8_t len);
   
   char* state();
-  uint8_t status();
+  // uint8_t show_state(bool print);
+  uint8_t show_ezmac(bool print);
+  uint16_t show_data_rate(bool print);
+  uint16_t show_frequency(bool print);
+  uint16_t show_modulation_control(bool print);
   bool reset();
   bool check_device();
   void xmit_tone(uint16_t duration);
@@ -506,6 +511,9 @@ public:
   void set_state(radiostate state);
   char* show_state(radiostate state);
 
+  //private:
+  radiocfg *_pcfg;              /* packet mode configuration */
+  radiocfg *_dcfg;              /* direct mode configuration */
   bool _direct; /* flag, true -> direct mode, false -> packet mode */
 };
 

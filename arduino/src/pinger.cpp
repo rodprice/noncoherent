@@ -5,9 +5,8 @@
  */
 
 #include <Arduino.h>
-#include "SPI.h"
 #include "pinger.h"
-#include "Si4432.h"
+#include "si4432.h"
 
 
 void setup() {                
@@ -17,18 +16,22 @@ void setup() {
   while(!Serial);
   Serial.println("Starting");
   
-  Si4432 radio = Si4432();
-  if (radio.check_device())
-    Serial.println("device check passed");
-  else
-    Serial.println("device check failed");
-  Serial.print("initial state = ");
-  Serial.println(radio.show_state(radio.get_state()));
-  radio.xmit_tone(500);
+  // Si4432 radio = Si4432();
+  // if (radio.check_device())
+  //   Serial.println("device check passed");
+  // else
+  //   Serial.println("device check failed");
+  // Serial.print("initial state = ");
+  // Serial.println(radio.show_state(radio.get_state()));
+  // radio.init_tx_direct();
+  // radio.show_modulation_control(true);
+  // radio.show_frequency(true);
+  // radio.show_data_rate(true);
+  // radio.show_ezmac(true);
+  // radio.xmit_tone(500);
 }
 
 void loop() {
-  SPI.end();
   digitalWrite(13, HIGH);   // set the LED on
   delay(500);              // wait for a second
   digitalWrite(13, LOW);    // set the LED off

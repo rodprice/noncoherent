@@ -1,6 +1,8 @@
+\#*
 .#*
 build*/
 teensy/
+TinyShield_GPS/
 
 # Prerequisites
 *.d
